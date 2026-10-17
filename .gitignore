@@ -1,0 +1,14 @@
+# Binaries and build directory
+build/
+*.o
+*.obj
+*.exe
+*.out
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# OS specific files
+.DS_Store
+Thumbs.db
