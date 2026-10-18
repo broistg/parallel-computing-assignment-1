@@ -552,6 +552,22 @@ int main(int argc, char** argv) {
         if (o.locks.empty() || std::find(o.locks.begin(), o.locks.end(), e.name) != o.locks.end()) sel.push_back(e);
     if (sel.empty()) { if (!rank) std::cerr << "no matching lock (see --list)\n"; MPI_Finalize(); return 64; }
 
+    // Fingerprint of everything that defines the workload (rounds, busy work, trials, warm-up, duration, lock
+    // parameters). Written to every row; the analysis reports platforms whose ids differ. The MPI workload is fixed
+    // by these defaults and never calibrated per machine.
+    std::string config_id;
+    {
+        std::ostringstream h;
+        h << "ops " << o.ops << " cs_work " << o.cs_work << " trials " << o.trials << " warmup " << o.warmup;
+        if (fairness) h << " duration_ms " << o.duration_ms;
+        for (auto& e : registry()) h << " | " << e.name << " " << e.params;
+        std::uint64_t x = 1469598103934665603ULL;
+        for (unsigned char ch : h.str()) { x ^= ch; x *= 1099511628211ULL; }
+        char b[17];
+        std::snprintf(b, sizeof b, "%016llx", static_cast<unsigned long long>(x));
+        config_id = b;
+    }
+
     Meta meta = collect_meta(MPI_COMM_WORLD);
     {
         Window probe(MPI_COMM_WORLD, 1);
@@ -663,10 +679,10 @@ int main(int argc, char** argv) {
                 std::cout << "lock,ranks,cs_work,out_work,duration_ms,trial,region_s,valid,total_acq,min_acq,median_acq,max_acq,"
                              "max_min_ratio,jain,wait_p50_ns,wait_p99_ns,wait_max_ns,rank_p99_min_ns,rank_p99_max_ns,"
                              "wait_samples,"
-                          << kMetaHeader << ",experiment,per_rank_acq\n";
+                          << kMetaHeader << ",experiment,config_id,per_rank_acq\n";
             else
                 std::cout << "lock,ranks,mode,cs_work,out_work,outside_k,trial,total_ops,seconds,ops_per_sec,valid," << kMetaHeader
-                          << ",experiment\n";
+                          << ",experiment,config_id\n";
         }
     }
     if (o.help) { MPI_Finalize(); return 0; }
@@ -710,8 +726,8 @@ int main(int argc, char** argv) {
                     if (!warm && !rank) {
                         const long total = strong ? strong_total : static_cast<long>(c.ranks) * o.ops;
                         const double ops_s = static_cast<double>(total) / s;
-                        std::printf("%s,%d,%s,%d,%d,%d,%d,%ld,%.6f,%.1f,%d,%s,%s\n", sel[li].name, c.ranks, c.mode.c_str(), c.cs, c.ow,
-                                    c.k, trial, total, s, ops_s, valid, meta_cols(meta, sel[li].params).c_str(), c.exp.c_str());
+                        std::printf("%s,%d,%s,%d,%d,%d,%d,%ld,%.6f,%.1f,%d,%s,%s,%s\n", sel[li].name, c.ranks, c.mode.c_str(), c.cs, c.ow,
+                                    c.k, trial, total, s, ops_s, valid, meta_cols(meta, sel[li].params).c_str(), c.exp.c_str(), config_id.c_str());
                         std::fflush(stdout);
                         if (!valid) std::fprintf(stderr, "[INVALID] %s ranks=%d: counter mismatch\n", sel[li].name, c.ranks);
                         if (valid) { secs[li].push_back(s); rate[li].push_back(ops_s); }
@@ -728,10 +744,10 @@ int main(int argc, char** argv) {
                         const FairMetrics m = fair_metrics(f);
                         std::string per;
                         for (size_t i = 0; i < f.counts.size(); ++i) per += (i ? ";" : "") + std::to_string(f.counts[i]);
-                        std::printf("%s,%d,%d,%d,%d,%d,%.4f,%d,%lld,%.0f,%.1f,%.0f,%.4f,%.4f,%.0f,%.0f,%.0f,%.0f,%.0f,%zu,%s,%s,%s\n",
+                        std::printf("%s,%d,%d,%d,%d,%d,%.4f,%d,%lld,%.0f,%.1f,%.0f,%.4f,%.4f,%.0f,%.0f,%.0f,%.0f,%.0f,%zu,%s,%s,%s,%s\n",
                                     sel[li].name, c.ranks, c.cs, c.ow, o.duration_ms, trial, s, valid, static_cast<long long>(m.total),
                                     m.min, m.med, m.max, m.ratio, m.jain, m.p50, m.p99, m.pmax, f.rank_p99_min, f.rank_p99_max,
-                                    f.waits.size(), meta_cols(meta, sel[li].params).c_str(), c.exp.c_str(), per.c_str());
+                                    f.waits.size(), meta_cols(meta, sel[li].params).c_str(), c.exp.c_str(), config_id.c_str(), per.c_str());
                         std::fflush(stdout);
                         if (!valid) std::fprintf(stderr, "[INVALID] %s ranks=%d: counter mismatch\n", sel[li].name, c.ranks);
                         if (valid) {

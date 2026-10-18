@@ -9,8 +9,11 @@ Parallel Computing assignment. Header-only locks, C++17, no external dependencie
 | `src/test_correctness.cpp` | Correctness and stress test harness |
 | `src/bench_mutex.cpp` | Performance and scalability benchmark (assignment workload, CSV output) |
 | `src/analyze_bench.py` | Summaries and figures from the timing CSV files (median, IQR; pandas, matplotlib) |
+| `src/config_check.py` | Checks shared by both analyzers: smoke and stale rows, config ids, timeouts, platform table |
+| `config/reference.cfg` | Frozen benchmark workload (N, `OUTSIDE_WORK` sets, iteration counts); read at run time, identical on every platform |
 | `src/analyze_fairness.py` | Summaries and figures from the fairness CSV files (Jain's index, wait times) |
-| `Makefile` | Build/run shortcuts (tests: `test`, `quick`, `control`, `tsan`, `mutate`; benchmark: `bench-quick`, `bench`, `bench-fair`, `analyze`, `OMP=1`) |
+| `Makefile` | Build/run shortcuts (tests: `test`, `test-quick`, `test-control`, `test-tsan`, `test-mutate`; benchmark: `bench-check`, `bench-smoke`, `bench-quick`, `bench`, `bench-fair`, `bench-analyze`, `bench-pilot`, `OMP=1`) |
+| `report_mutex.tex` | LaTeX report (design, rationale, test method, benchmark methodology) |
 | `build/` | Compiler output (binaries), created by make; `make clean` removes it |
 | `results/` | Everything the programs write: CSV files and `plots/`; kept by `make clean` (`make distclean` removes it) |
 
@@ -55,10 +58,10 @@ Requires a C++17 compiler and pthreads (or the Windows equivalent).
 ```bash
 make              # builds build/test_correctness and build/bench_mutex
 make test         # full suite (about 1 minute on a 2-core machine; longer with more cores)
-make quick        # smoke test
-make control      # negative control: harness must detect a lock that does nothing
-make tsan         # ThreadSanitizer build and run
-make mutate       # mutation test (failures / races are EXPECTED here)
+make test-quick   # fast subset
+make test-control # negative control: harness must detect a lock that does nothing
+make test-tsan    # ThreadSanitizer build and run
+make test-mutate  # mutation test (failures / races are EXPECTED here)
 ```
 
 Without make:
@@ -114,9 +117,10 @@ resolution is coarse (about 1–15 ms by default), so the `*_sleep` variants are
 **ARM Linux (Raspberry Pi, servers)** – works with GCC/Clang; the `yield` hint is a no-op on some
 cores. Run the suite here as well.
 
-**Hybrid CPUs (Intel P/E cores)** – results can vary between runs depending on which cores the threads land on; note this in the report and pin threads when benchmarking.
+**Hybrid CPUs (Intel P/E cores)** – results can vary between runs depending on which cores the
+threads land on; note this in the report and pin threads when benchmarking.
 
-**ThreadSanitizer** - run it with few threads (`make tsan` uses 1, 2, 4). With many threads, plain `tas`
+**ThreadSanitizer** - run it with few threads (`make test-tsan` uses 1, 2, 4). With many threads, plain `tas`
 (no backoff) can stop making progress under TSan: TSan serialises atomic operations on the same address, so
 the waiters' constant `test_and_set` starves the holder's release. `tas-pause`, `ttas` and the other variants
 are unaffected, and the same lock passes in a normal build. Races are detected regardless of the thread count.
@@ -134,11 +138,12 @@ not wall time, so slow is not reported as a deadlock.
 `OUTSIDE_WORK` calls of `is_prime(N)`) for every selected lock and appends one CSV row per run.
 
 ```bash
+make bench-pilot PLATFORM=ref                # one-time, reference machine only (see Fixed workload)
 make bench-quick PLATFORM=mylaptop     # shorter run: all five series, 5 reps -> results/quick_mylaptop.csv
 make bench PLATFORM=mylaptop           # the run for the report: all five series, 10 reps -> results/bench_mylaptop.csv
 make bench-fair PLATFORM=mylaptop      # fairness experiment -> results/fair_mylaptop.csv
 make bench OMP=1 PLATFORM=mylaptop     # optional: any of the three targets with the OpenMP baselines added
-make analyze                           # summaries and figures from results/bench_*.csv and fair_*.csv -> results/plots/
+make bench-analyze                           # summaries and figures from results/bench_*.csv and fair_*.csv -> results/plots/
 ```
 
 Run `bench-quick` first to check the setup and get a first look (`python3 src/analyze_bench.py results/quick_*.csv --out results/plots_quick`),
@@ -149,8 +154,8 @@ passed with `BENCHFLAGS`, e.g. `make bench BENCHFLAGS="--series=oversub --locks=
 refuses to append to them, so move them away.
 
 Without make: `mkdir -p build && g++ -std=c++17 -O2 -pthread src/bench_mutex.cpp -o build/bench_mutex && build/bench_mutex --help`.
-`build/bench_mutex --dry-run` prints the series, their configurations and the number of runs without executing anything.
-`--series=scale,contention,cs,strong,oversub` runs a subset of the series (default: all five); `--medium-ns` sets the medium critical-section length.
+Run it from the project root (it reads `config/reference.cfg`; `--config=FILE` selects another). `build/bench_mutex --dry-run` prints the series, their configurations and the number of runs without executing anything.
+`--series=scale,contention,cs,strong,oversub` runs a subset of the series (default: all five). `--filter=n=medium,outside=0|8,threads=2` runs only the matching configurations (keys `n` (number or small|medium|large), `outside`, `threads`, `series`, `mode`).
 
 **Contenders** (`--list`): own `tas`, `tas-pause`, `ttas`, `ttas-pause`, `ticket`, `ticket-prop`, `mcs`;
 baselines `std-mutex`, `pthread-mutex`, `pthread-spin` (Linux only; macOS has no `pthread_spin_lock`),
@@ -171,9 +176,58 @@ first/last per-thread finish times (their spread indicates unfairness).
 | `fixed` | every thread runs `iters` iterations (the skeleton's `NUM_OF_ITERS`); total work grows with the threads | time stays flat | time, throughput (critical sections per microsecond) |
 | `strong` | a fixed total, split across the threads | time falls as 1/threads | time, speed-up versus the same lock on 1 thread |
 
-**Experiment series.** The default run is five series. "Medium" N is calibrated per machine so that one
-critical section takes about 1 us (`--medium-ns`, default 1000); "small" and "large" are about 0.1 and 10 us.
-Thread counts: `t_scale` = powers of two up to the logical CPUs plus the logical-CPU count and the exact
+**Fixed workload.** The primary benchmark runs the same computation on every platform: the same N, the same
+`OUTSIDE_WORK` sets and the same iteration counts. They are frozen in `config/reference.cfg`, which the program reads at
+run time and never changes. The file holds
+two explicit tables, kept apart on purpose: `iters N OUTSIDE_WORK count` is the number of iterations **per thread**
+(fixed-work series) and `strong N OUTSIDE_WORK total` is the **total** number of iterations split across the threads
+(strong-scaling series, where each thread runs `total / threads`). Small, medium and large critical sections are
+N = 79, 739 and 7393 (about 0.1, 1 and 10 us on the reference machine: AMD Ryzen 5 6600H, gcc 15.2.0, `-O2`, WSL2); one
+uncontended thread of each configuration runs about 50 ms there. A faster or slower CPU therefore has a shorter or longer
+critical section for the same work. The duration of `is_prime(N)` measured on the running machine is stored in every row
+(`cs_ns`) and quoted in the discussion; it never changes N or a count.
+
+Every CSV row carries `config_id`, a fingerprint of the normalised config text, the repetitions, the warm-up, the iteration
+scale and the parameters of the lock variants. All platforms of one comparison must show the same id; the analysis
+reports differences.
+
+| Quantity | Fixed (same on every platform) | Measured per platform (stored, never used to change the workload) |
+|---|---|---|
+| N (critical-section size), `OUTSIDE_WORK` sets, thread-count rules | yes | |
+| Iterations per thread, strong-scaling totals | yes (`config/reference.cfg`) | |
+| Repetitions, warm-up, lock parameters, flags | yes | |
+| Thread counts (powers of two up to the logical CPUs, physical and logical counts) | rule is fixed | the resulting values depend on the CPU |
+| Duration of `is_prime(N)`, run times, hardware, compiler, kernel | | yes (`cs_ns`, `results/platform_<platform>.txt`, `platform_table.csv`) |
+
+**Workflow.**
+
+```bash
+make bench-check PLATFORM=mylaptop      # platform report + sanity checks (warnings only) -> results/platform_mylaptop.txt
+make bench-smoke PLATFORM=mylaptop      # tiny end-to-end run (1% of the iterations): rows are marked and never analysed
+make bench PLATFORM=mylaptop      # the real run; sanity checks run first and their warnings are printed
+make bench-analyze                      # checks the rows against config/reference.cfg, then summaries and figures
+```
+
+`check` warns when: the cost of `is_prime` does not grow with N like on the reference machine; doubling a batch of
+`is_prime(N)` calls does not double the time (the compiler may have removed or hoisted the calls); the single-thread
+benchmark loop does not take 1 : 3 : 9 times as long for `OUTSIDE_WORK` 0 : 2 : 8, or its summed results are wrong; the
+fastest configuration runs shorter than 20 ms; or a baseline is unavailable. Warnings never change anything.
+
+**One-time pilot (reference machine only).** `make bench-pilot` measures the real single-thread benchmark loop (lock acquire,
+critical section, release, `OUTSIDE_WORK` outside calls) for every (N, `OUTSIDE_WORK`) pair of the series in batches of at
+least 20 ms, checks that all locks agree on the loop time, projects the worst case at twice the logical CPUs, runs the sanity
+checks above and writes a **candidate** `config/pilot_<platform>.cfg` (options `--target-ms`, `--pilot-ns`,
+`--pilot-cpus`). It warns only and never edits `config/reference.cfg`; review the candidate and copy it by hand.
+`--iters-scale=K` multiplies all counts for smoke tests only: those rows carry `iters_scale != 1` and the analysis
+excludes them.
+
+**Revision policy.** Keep the counts as they are unless a configuration is impractical, for example it hits the run cap
+(`status=timeout`; the analysis lists these as revision candidates). Then edit that count in `config/reference.cfg`, bump
+`version`, and rerun that configuration on **all** platforms, e.g.
+`make bench BENCHFLAGS="--filter=n=medium,outside=16"`. The analysis excludes rows whose counts differ from the current
+file (stale rows) and says which platform has to rerun which configuration.
+
+**Experiment series.** The default run is five series. Thread counts: `t_scale` = powers of two up to the logical CPUs plus the logical-CPU count and the exact
 physical-core count; `t3` = {1, physical cores, logical CPUs}. A configuration that belongs to several series
 runs once and carries all its tags in the `experiment` column.
 
@@ -188,9 +242,7 @@ runs once and carries all its tags in the `experiment` column.
 Series 5 reports throughput **and** whole-program time for every lock. With fixed work per thread the ideal
 ratio 2x-threads / 1x-threads is 2 for time and 1 for throughput; `analyze_bench.py` prints this table and writes
 `results/plots/oversub_table.csv`. Oversubscribed runs are marked `oversub` and mostly measure the OS scheduler.
-Iteration counts are sized so that one uncontended thread runs about `--target-ms` (50 ms) and are the same for
-all locks of a configuration. Because N is calibrated per platform, compare platforms at equal critical-section
-length (the CSV stores N and the measured `cs_ns`); compare absolute times only together with the stored N and `cs_ns`.
+Iteration counts are the same for all locks of a configuration and, with the fixed workload, on every platform.
 
 **Protocol.** One warm-up pass, then at least 5 measured repetitions, 10 for the full `make bench`
 (`--reps`, `--warmup`). Reported: median and interquartile range (IQR); minimum and standard deviation are
@@ -214,7 +266,7 @@ variable is the stop flag, which is read-only unless a run times out).
 
 **Compiler settings.** Every variant is built with the same compiler and flags (`-O2`, recorded in each CSV
 row through `-DBENCH_FLAGS`). The benchmark warns if it was built without optimisation or with
-ThreadSanitizer; sanitizer builds (`make tsan`, `mutate`) are correctness diagnostics only.
+ThreadSanitizer; sanitizer builds (`make test-tsan`, `make test-mutate`) are correctness diagnostics only.
 
 **Lock parameters.** The header and every CSV row (`lock_params`) state each variant's parameters, taken
 from the lock types: `tas-pause`/`ttas-pause` use pause backoff 4..1024 `cpu_relax` (doubling, jitter in
@@ -242,7 +294,7 @@ is under test. Defaults: at least 2 threads, sustained contention (`OUTSIDE_WORK
 repetitions, locks in block-randomised order, written to a separate file `results/fair_<platform>.csv`. Reported per run:
 acquisitions per thread (min, median, max), max/min ratio, Jain's fairness index
 `(sum x)^2 / (n * sum x^2)` (1 = equal shares), and `acquire()` latency p50, p99 and max plus the spread of the
-per-thread p99. `analyze_fairness.py` (called by `make analyze`) reports medians and the IQR of Jain's index.
+per-thread p99. `analyze_fairness.py` (called by `make bench-analyze`) reports medians and the IQR of Jain's index.
 Interpret with care: FIFO order (ticket, MCS) is not the same as equal throughput, a finite experiment
 characterises the observed behaviour and does not prove that starvation is impossible, and oversubscribed runs
 (marked `oversub`) mostly measure the OS scheduler. The correctness harness's fairness test is separate and

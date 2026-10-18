@@ -3,7 +3,10 @@
 
     python3 analyze_bench.py bench_results.csv [more.csv ...] [--out plots] [--no-plots]
 
-Writes   <out>/bench_summary.csv   median / IQR / min / sd per configuration (whole-program time and the
+Rows are first checked against the canonical config (config_check.py): smoke and stale rows are dropped,
+config ids, timeouts, flags and baselines are reported.
+Writes   <out>/platform_table.csv  one row per platform: hardware, compiler, flags, pinning, is_prime time vs reference
+         <out>/bench_summary.csv   median / IQR / min / sd per configuration (whole-program time and the
                                    start-gate-to-join time region_*), speed-up, time relative to std-mutex,
                                    finish-time spread
          <out>/oversub_table.csv   series 5: throughput and whole-program time of every lock at the logical
@@ -26,6 +29,8 @@ import os
 import sys
 
 import pandas as pd
+
+import config_check
 
 KEYS = ["platform", "series", "mode", "lock", "threads", "outside_work", "N"]
 
@@ -293,9 +298,16 @@ def main():
     ap.add_argument("csv", nargs="+")
     ap.add_argument("--out", default="results/plots")
     ap.add_argument("--no-plots", action="store_true")
+    ap.add_argument("--config", default="config/reference.cfg", help="canonical configuration the rows are checked against")
     a = ap.parse_args()
 
     df = pd.concat([pd.read_csv(p) for p in a.csv], ignore_index=True)
+    cfg = config_check.load_cfg(a.config)
+    print(f"canonical config: {a.config} version {cfg['version']} (reference: {cfg['reference']})")
+    df = config_check.validate_timing(df, cfg)
+    if len(df) == 0:
+        sys.exit("no comparable rows left")
+    config_check.timeouts(df)
     bad = df[df["status"] != "ok"]
     print(f"{len(df)} runs from {len(a.csv)} file(s); platforms: {', '.join(sorted(df['platform'].unique()))}")
     if len(bad):
@@ -304,6 +316,9 @@ def main():
         print(bad.groupby(["platform", "lock", "status"]).size().to_string())
 
     os.makedirs(a.out, exist_ok=True)
+    pt = config_check.platform_table(df, cfg)
+    pt.to_csv(os.path.join(a.out, "platform_table.csv"), index=False)
+    print(f"platform table -> {os.path.join(a.out, 'platform_table.csv')}")
     s = summarise(df)
     path = os.path.join(a.out, "bench_summary.csv")
     s.round(4).to_csv(path, index=False)

@@ -35,10 +35,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <map>
 #include <set>
+#include <stdexcept>
 #include <iostream>
 #include <mutex>
 #include <random>
@@ -714,28 +717,159 @@ static std::vector<LockEntry> registry() {
 }
 
 // ============================================================================
+// Canonical configuration (config/reference.cfg)
+// ============================================================================
+// The primary benchmark runs the same workload on every platform: the same N,
+// the same OUTSIDE_WORK sets and the same iteration counts. They are frozen in
+// a text file that was produced once by `--pilot` on the reference machine and
+// is shared by the group (see README, "Fixed workload"). The program only looks
+// the counts up; it never derives them, and a missing entry is an error.
+//
+//   iters   N OUTSIDE_WORK count   iterations PER THREAD (fixed-work series)
+//   strong  N OUTSIDE_WORK total   TOTAL iterations split across the threads (strong-scaling series)
+//
+// The fingerprint (config_id) hashes the normalised file, the repetitions,
+// warm-up, iteration scale and the parameters of the lock variants, and is
+// written to the header and to every CSV row.
+
+struct BenchConfig {
+    std::string path;
+    std::string norm;  // normalised text without comments and the free-text reference line
+    int version = 0;
+    std::string reference;
+    int target_ms = 0, ref_cpus = 0, reps = 0, warmup = 0;
+    int N[3] = {0, 0, 0};            // small, medium, large
+    double cs_ns[3] = {0, 0, 0};     // is_prime(N) durations measured on the reference machine
+    std::map<std::string, std::vector<int>> outside;  // series -> OUTSIDE_WORK values
+    std::map<std::pair<int, int>, long> iters;        // (N, OUTSIDE_WORK) -> iterations per thread
+    std::map<std::pair<int, int>, long> strong;       // (N, OUTSIDE_WORK) -> total iterations
+};
+
+static const char* const kSeriesNames[5] = {"scale", "contention", "cs", "strong", "oversub"};
+
+static bool load_config(const std::string& path, BenchConfig& c, std::string& err) {
+    std::ifstream in(path);
+    if (!in) {
+        err = "cannot open " + path + " (run from the project root or pass --config=FILE)";
+        return false;
+    }
+    c.path = path;
+    std::string line;
+    int lineno = 0;
+    auto bad = [&](const std::string& m) {
+        err = path + ":" + std::to_string(lineno) + ": " + m;
+        return false;
+    };
+    while (std::getline(in, line)) {
+        ++lineno;
+        const auto h = line.find('#');
+        if (h != std::string::npos) line.erase(h);
+        std::istringstream ss(line);
+        std::vector<std::string> t;
+        std::string w;
+        while (ss >> w) t.push_back(w);
+        if (t.empty()) continue;
+        const std::string& k = t[0];
+        if (k == "reference") {
+            c.reference = line.substr(line.find("reference") + 9);
+            const auto b = c.reference.find_first_not_of(" \t");
+            c.reference = b == std::string::npos ? "" : c.reference.substr(b);
+            continue;  // free text, not part of the fingerprint
+        }
+        for (const auto& x : t) c.norm += x + " ";
+        c.norm += "\n";
+        try {
+            if (k == "version" && t.size() == 2) c.version = std::stoi(t[1]);
+            else if (k == "target_ms" && t.size() == 2) c.target_ms = std::stoi(t[1]);
+            else if (k == "reference_logical_cpus" && t.size() == 2) c.ref_cpus = std::stoi(t[1]);
+            else if (k == "repetitions" && t.size() == 2) c.reps = std::stoi(t[1]);
+            else if (k == "warmup" && t.size() == 2) c.warmup = std::stoi(t[1]);
+            else if (k == "n" && t.size() == 4) {
+                const int idx = t[1] == "small" ? 0 : t[1] == "medium" ? 1 : t[1] == "large" ? 2 : -1;
+                if (idx < 0) return bad("n must be small, medium or large");
+                c.N[idx] = std::stoi(t[2]);
+                c.cs_ns[idx] = std::stod(t[3]);
+            } else if (k == "outside" && t.size() >= 3) {
+                std::vector<int> v;
+                for (std::size_t i = 2; i < t.size(); ++i) v.push_back(std::stoi(t[i]));
+                c.outside[t[1]] = v;
+            } else if ((k == "iters" || k == "strong") && t.size() == 4) {
+                const std::pair<int, int> key{std::stoi(t[1]), std::stoi(t[2])};
+                (k == "iters" ? c.iters : c.strong)[key] = std::stol(t[3]);
+            } else {
+                return bad("unknown or malformed line starting with '" + k + "'");
+            }
+        } catch (const std::exception&) {
+            return bad("cannot parse a number on the '" + k + "' line");
+        }
+    }
+    if (c.version <= 0 || c.target_ms <= 0 || c.ref_cpus <= 0 || c.reps <= 0 || c.warmup < 0 || !c.N[0] || !c.N[1] ||
+        !c.N[2]) {
+        err = path + ": missing version, target_ms, reference_logical_cpus, repetitions, warmup or n lines";
+        return false;
+    }
+    for (const char* s : kSeriesNames)
+        if (!c.outside.count(s) || c.outside[s].empty()) {
+            err = path + ": missing 'outside " + s + " ...' line";
+            return false;
+        }
+    return true;
+}
+
+static long cfg_count(const std::map<std::pair<int, int>, long>& m, int N, int out, const char* table,
+                      const std::string& path) {
+    const auto it = m.find({N, out});
+    if (it == m.end())
+        throw std::runtime_error(path + " has no '" + table + "' entry for N=" + std::to_string(N) +
+                                 " OUTSIDE_WORK=" + std::to_string(out) +
+                                 " (regenerate the file with --pilot, or add the entry and bump the version)");
+    return it->second;
+}
+
+// --iters-scale is for smoke tests only: it multiplies every count; rows are marked with the scale.
+static long scaled(long v, double s) { return s == 1.0 ? v : std::max(1L, std::lround(static_cast<double>(v) * s)); }
+
+static std::uint64_t fnv1a(const std::string& s) {
+    std::uint64_t h = 1469598103934665603ULL;
+    for (unsigned char ch : s) {
+        h ^= ch;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+static std::string hex16(std::uint64_t v) {
+    char b[17];
+    std::snprintf(b, sizeof b, "%016llx", static_cast<unsigned long long>(v));
+    return b;
+}
+
+// ============================================================================
 // Options
 // ============================================================================
 
 struct Options {
     std::string platform;
+    std::string config = "config/reference.cfg";  // canonical configuration
     std::string csv = "bench_results.csv";
     std::string mode = "timing";      // timing | fairness
     std::string fair_csv = "fair_results.csv";
     long duration_ms = 1000;          // fairness: length of one run
     std::string series = "all";       // scale,contention,cs,strong,oversub | all
-    double medium_ns = 1000;          // "medium" critical-section length of the series
+    std::string filter;               // restrict the plan, e.g. "N=739,outside=0" (re-running one configuration)
     std::vector<std::string> locks;
-    long iters = 0;                   // fixed mode, per thread (0 = auto)
-    long total = 0;                   // strong mode, total (0 = auto)
-    int target_ms = 50;
-    int reps = 5;
-    int warmup = 1;
+    double iters_scale = 1.0;         // smoke tests only (rows are marked, analysis excludes them)
+    int reps = -1;                    // -1: from the config file
+    int warmup = -1;
     long max_run_ms = 20000;
     unsigned seed = 12345;
     bool pin = false;
     bool dry_run = false;
     bool help = false;
+    bool check = false;               // platform report and sanity checks (warn only)
+    bool pilot = false;               // one-time pilot on the reference machine: writes a candidate config
+    int target_ms = 50;               // pilot: duration of one uncontended thread
+    double pilot_ns = 1000;           // pilot: medium critical-section length (small = /10, large = x10)
+    int pilot_cpus = 0;               // pilot: reference logical-CPU count (0 = this machine)
 };
 
 static std::vector<std::string> split(const std::string& s, char sep) {
@@ -753,19 +887,38 @@ static std::vector<std::string> split(const std::string& s, char sep) {
     return out;
 }
 
+// --filter=K=V,K=V : keys n (number or small|medium|large), outside, threads, series, mode; values joined by '|'.
+// A configuration is run when it matches every key (used to re-run one configuration on every platform).
+struct Filter {
+    std::map<std::string, std::set<std::string>> k;
+    bool empty() const { return k.empty(); }
+    bool ok(const std::string& series, const std::string& mode, int thr, int out, int N) const {
+        auto has = [&](const char* key, const std::string& v) {
+            const auto it = k.find(key);
+            return it == k.end() || it->second.count(v) > 0;
+        };
+        return has("series", series) && has("mode", mode) && has("threads", std::to_string(thr)) &&
+               has("outside", std::to_string(out)) && has("n", std::to_string(N));
+    }
+};
+
 static void print_help() {
     std::cout <<
         "Usage: bench_mutex [options]\n"
         "  --locks=a,b|core|extended|all   locks to run (default core); see --list\n"
+        "  --config=FILE                   canonical configuration (default config/reference.cfg)\n"
         "  --series=a,b|all                experiment series (default all): scale, contention, cs, strong, oversub\n"
-        "  --medium-ns=T                   medium critical-section length (default 1000 ns); small = T/10, large = 10*T\n"
+        "  --filter=K=V,K=V                run only matching configurations; keys n (number or small|medium|large),\n"
+        "                                  outside, threads, series, mode; values separated by |\n"
         "  --mode=timing|fairness          timing series (default) or the separate duration-based fairness experiment\n"
         "  --duration-ms=T                 fairness: length of one run (default 1000)\n"
         "  --fair-csv=FILE                 fairness: output file (default fair_results.csv)\n"
-        "  --iters=K                       fixed-work series: iterations per thread (default: auto)\n"
-        "  --total=K                       strong series: total iterations (default: auto)\n"
-        "  --target-ms=T                   auto sizing: one thread, no contention, about T ms (default 50)\n"
-        "  --reps=R  --warmup=W            repetitions (default 5) and discarded warm-up runs (default 1)\n"
+        "  --iters-scale=K                 SMOKE TESTS ONLY: multiply all iteration counts (rows are marked, not analysed)\n"
+        "  --check                         platform report and sanity checks (warnings only), then exit\n"
+        "  --pilot                         ONE-TIME, on the reference machine: measure the real loop and write a\n"
+        "                                  candidate config/pilot_<platform>.cfg (options: --target-ms=T, --pilot-ns=T,\n"
+        "                                  --pilot-cpus=K)\n"
+        "  --reps=R  --warmup=W            repetitions and discarded warm-up runs (default: from the config file)\n"
         "  --max-run-ms=M                  cap per run; capped runs are recorded as timeout (default 20000)\n"
         "  --pin                           pin thread i to a CPU (physical cores first; Linux/Windows)\n"
         "  --platform=NAME                 label stored in the CSV (default: hostname)\n"
@@ -787,12 +940,16 @@ static bool parse_args(int argc, char** argv, Options& o, bool& list) {
         else if (a == "--list") list = true;
         else if (a == "--pin") o.pin = true;
         else if (a == "--dry-run") o.dry_run = true;
+        else if (a == "--check") o.check = true;
+        else if (a == "--pilot") o.pilot = true;
         else if ((v = val("--series"))) o.series = v;
-        else if ((v = val("--medium-ns"))) o.medium_ns = std::max(1.0, std::atof(v));
+        else if ((v = val("--config"))) o.config = v;
+        else if ((v = val("--filter"))) o.filter = v;
+        else if ((v = val("--iters-scale"))) o.iters_scale = std::atof(v);
+        else if ((v = val("--pilot-ns"))) o.pilot_ns = std::max(1.0, std::atof(v));
+        else if ((v = val("--pilot-cpus"))) o.pilot_cpus = std::max(1, std::atoi(v));
         else if ((v = val("--locks"))) o.locks = split(v, ',');
         else if ((v = val("--mode"))) o.mode = v;
-        else if ((v = val("--iters"))) o.iters = std::max(1L, std::atol(v));
-        else if ((v = val("--total"))) o.total = std::max(1L, std::atol(v));
         else if ((v = val("--target-ms"))) o.target_ms = std::max(1, std::atoi(v));
         else if ((v = val("--reps"))) o.reps = std::max(1, std::atoi(v));
         else if ((v = val("--warmup"))) o.warmup = std::max(0, std::atoi(v));
@@ -806,6 +963,10 @@ static bool parse_args(int argc, char** argv, Options& o, bool& list) {
             std::cerr << "Unknown option: " << a << "\n";
             return false;
         }
+    }
+    if (!(o.iters_scale > 0.0)) {
+        std::cerr << "--iters-scale must be positive\n";
+        return false;
     }
     if (o.mode != "timing" && o.mode != "fairness") {
         std::cerr << "--mode must be timing or fairness\n";
@@ -880,13 +1041,13 @@ static void print_platform(const PlatformInfo& pi, const std::vector<const LockE
 static const char* kCsvHeader =
     "platform,cpu_model,os,arch,compiler,usable_cpus,pinned,series,mode,lock,threads,outside_work,N,"
     "cs_ns,iters_per_thread,total_iters,rep,status,time_ms,region_ms,finish_min_ms,finish_max_ms,"
-    "completed,expected,throughput_mops,physical_cores,kernel,flags,cpu_list,lock_params,experiment";
+    "completed,expected,throughput_mops,physical_cores,kernel,flags,cpu_list,lock_params,experiment,config_id,iters_scale";
 
 static const char* kFairHeader =
     "platform,cpu_model,os,arch,compiler,usable_cpus,pinned,series,lock,threads,outside_work,N,cs_ns,"
     "duration_ms,region_ms,rep,status,total_acq,min_acq,median_acq,max_acq,max_min_ratio,jain,"
     "wait_p50_ns,wait_p99_ns,wait_max_ns,thread_p99_min_ns,thread_p99_max_ns,wait_samples,"
-    "physical_cores,kernel,flags,cpu_list,lock_params,per_thread_acq";
+    "physical_cores,kernel,flags,cpu_list,lock_params,config_id,per_thread_acq";
 
 // Opens `path` for appending; writes `header` if the file is new. Refuses a file written with another
 // column layout (an older version), because appended rows would not line up.
@@ -981,7 +1142,7 @@ static FairMetrics fair_metrics(const FairResult& fr) {
 
 static int run_fairness_mode(const Options& opt, const PlatformInfo& pi, const std::vector<int>& cpus,
                              const std::vector<const LockEntry*>& sel, std::vector<int> threads,
-                             int N, double cs_ns) {
+                             int N, double cs_ns, const Filter& flt, const std::string& config_id) {
     threads.erase(std::remove_if(threads.begin(), threads.end(), [](int t) { return t < 2; }), threads.end());
     if (threads.empty()) {
         std::cerr << "[bench] fairness needs at least 2 threads\n";
@@ -993,12 +1154,18 @@ static int run_fairness_mode(const Options& opt, const PlatformInfo& pi, const s
 
     struct Cfg { int threads, outside, N; double cs_ns; std::string series; };
     std::vector<Cfg> cfgs;
-    for (int t : threads) cfgs.push_back({t, 0, N, cs_ns, t > pi.hw ? "oversub" : "core"});  // sustained contention
+    for (int t : threads)  // sustained contention
+        if (flt.ok("fairness", "fairness", t, 0, N)) cfgs.push_back({t, 0, N, cs_ns, t > pi.hw ? "oversub" : "core"});
+    if (cfgs.empty()) {
+        std::cerr << "[bench] the filter leaves no fairness configuration\n";
+        return 64;
+    }
 
     std::cout << "============================================================\n";
     std::cout << "Mutex lock fairness experiment (fixed duration, per-thread counters)\n";
     std::cout << "============================================================\n";
     print_platform(pi, lk);
+    std::cout << "Config id      : " << config_id << "\n";
     std::cout << "Duration       : " << opt.duration_ms << " ms per run, reps " << opt.reps << " (+" << opt.warmup << " warm-up)\n";
     std::cout << "Wait sampling  : acquire() timed on every " << kSampleEvery << "th acquisition (per-thread log, merged after join)\n";
     std::cout << "Plan           : " << cfgs.size() << " configurations x " << lk.size() * (opt.reps + opt.warmup)
@@ -1050,7 +1217,7 @@ static int run_fairness_mode(const Options& opt, const PlatformInfo& pi, const s
                 << ',' << m.total << ',' << static_cast<std::uint64_t>(m.min) << ',' << std::setprecision(1) << m.med
                 << ',' << static_cast<std::uint64_t>(m.max) << ',' << std::setprecision(4) << m.ratio << ',' << m.jain
                 << ',' << std::setprecision(1) << m.p50 << ',' << m.p99 << ',' << m.pmax << ',' << m.tp99_min << ','
-                << m.tp99_max << ',' << m.samples << ',' << meta_columns(pi) << ',' << q(lk[li]->params) << ',' << per
+                << m.tp99_max << ',' << m.samples << ',' << meta_columns(pi) << ',' << q(lk[li]->params) << ',' << config_id << ',' << per
                 << "\n";
             csv.flush();
         };
@@ -1096,6 +1263,328 @@ static int run_fairness_mode(const Options& opt, const PlatformInfo& pi, const s
     if (timeouts) std::cout << "WARNING: " << timeouts << " run(s) timed out (excluded)\n";
     std::cout << "============================================================\n";
     return invalid > 0 ? 1 : 0;
+}
+
+// ============================================================================
+// Platform checks (--check, and quietly before every run) and the one-time pilot
+// ============================================================================
+// Everything here only WARNS. Nothing adjusts the frozen configuration.
+
+static const double kMinRunMs = 20.0;           // the fastest configuration should run at least this long
+static const double kFifoOversubFactor = 15.0;  // worst slow-down seen for FIFO locks at 2x oversubscription
+
+static const LockEntry* find_lock(const std::vector<LockEntry>& reg, const char* name) {
+    for (const auto& e : reg)
+        if (std::strcmp(e.name, name) == 0) return &e;
+    return nullptr;
+}
+
+// Total time in ns of one batch of `calls` calls of is_prime(N). Large batches are timed instead of single calls.
+static double batch_ns(int N, long calls) {
+    volatile int np = N;
+    const auto t0 = Clock::now();
+    std::uint64_t sink = 0;
+    for (long i = 0; i < calls; ++i) sink += is_prime(np);
+    const double ns = std::chrono::duration<double, std::nano>(Clock::now() - t0).count();
+    if (sink == 0xFFFFFFFFFFFFULL) std::puts("");
+    return ns;
+}
+
+static long round3(double x) {
+    if (x < 1000) return std::max(1L, std::lround(x));
+    const double p = std::pow(10.0, std::floor(std::log10(x)) - 2);
+    return std::lround(std::round(x / p) * p);
+}
+
+// Time of one iteration of the REAL benchmark loop (acquire, is_prime(N), release, then `out` calls of
+// is_prime(N)) with one thread, in ns. The batch grows until a run lasts >= 20 ms; median of 3 runs.
+static double loop_ns_per_iter(const LockEntry& L, int N, int out, double* spread = nullptr) {
+    RunSpec rs;
+    rs.threads = 1;
+    rs.outside = out;
+    rs.N = N;
+    rs.iters = 200;
+    for (;;) {
+        const RunResult r = L.fn(rs);
+        if (r.total_ms >= 20.0 || rs.iters > 400'000'000L) break;
+        const double f = r.total_ms > 0.01 ? std::min(10.0, std::max(2.0, 25.0 / r.total_ms)) : 10.0;
+        rs.iters = static_cast<long>(static_cast<double>(rs.iters) * f);
+    }
+    std::vector<double> v;
+    for (int i = 0; i < 3; ++i) v.push_back(L.fn(rs).total_ms * 1e6 / static_cast<double>(rs.iters));
+    const double m = median(v);
+    if (spread) *spread = (*std::max_element(v.begin(), v.end()) - *std::min_element(v.begin(), v.end())) / m;
+    return m;
+}
+
+static std::vector<std::string> unavailable_baselines() {
+    std::vector<std::string> u;
+#if defined(_WIN32)
+    u.push_back("pthread-mutex (no pthreads on Windows)");
+#endif
+#if !defined(__linux__)
+    u.push_back("pthread-spin (pthread_spinlock_t is only used on Linux; macOS has none)");
+#endif
+#if !defined(USE_OPENMP)
+    u.push_back("omp-lock, omp-critical (not built with OpenMP; optional, make OMP=1)");
+#endif
+    return u;
+}
+
+struct CheckReport {
+    std::vector<std::string> lines, warnings;
+    void note(const std::string& s) { lines.push_back(s); }
+    void warn(const std::string& s) {
+        lines.push_back("WARNING: " + s);
+        warnings.push_back(s);
+    }
+};
+
+static std::string fmt(double v, int prec = 1) {
+    std::ostringstream o;
+    o << std::fixed << std::setprecision(prec) << v;
+    return o.str();
+}
+
+// cs[i]: is_prime(N[i]) duration measured on THIS machine.
+static CheckReport run_checks(const BenchConfig& cfg, const Options& opt, const std::vector<LockEntry>& reg,
+                              const std::vector<const LockEntry*>& sel, const double (&cs)[3]) {
+    CheckReport R;
+    const char* nm[3] = {"small", "medium", "large"};
+    // 1. durations of the fixed N on this machine (a platform-dependent consequence of fixed N, recorded as cs_ns)
+    for (int i = 0; i < 3; ++i)
+        R.note(std::string("is_prime(") + std::to_string(cfg.N[i]) + ") [" + nm[i] + "]: " + fmt(cs[i]) +
+               " ns on this machine, " + fmt(cfg.cs_ns[i]) + " ns on the reference (x" + fmt(cs[i] / cfg.cs_ns[i], 2) + ")");
+
+    // 2. optimisation sanity: doubling the batch must double the time (no elimination / hoisting of the calls)
+    {
+        const long k = std::max(1000L, static_cast<long>(1.5e7 / std::max(1.0, cs[1])));
+        double t1 = 1e300, t2 = 1e300;
+        for (int i = 0; i < 3; ++i) {
+            t1 = std::min(t1, batch_ns(cfg.N[1], k));
+            t2 = std::min(t2, batch_ns(cfg.N[1], 2 * k));
+        }
+        const double ratio = t2 / t1;
+        const std::string m = "batch of 2k calls / batch of k calls = " + fmt(ratio, 2) + " (expected 2)";
+        if (ratio < 1.8 || ratio > 2.2) R.warn(m + ": is_prime calls may be eliminated or hoisted by the compiler");
+        else R.note("sanity 1 ok: " + m);
+    }
+    // 3. is_prime cost must scale with N like on the reference machine
+    {
+        const double mr = cs[1] / cs[0], rr = cfg.cs_ns[1] / cfg.cs_ns[0];
+        const double lr = cs[2] / cs[1], lrr = cfg.cs_ns[2] / cfg.cs_ns[1];
+        const std::string m = "cost ratio medium/small " + fmt(mr, 2) + " (reference " + fmt(rr, 2) + "), large/medium " +
+                              fmt(lr, 2) + " (reference " + fmt(lrr, 2) + ")";
+        if (mr < 0.75 * rr || mr > 1.25 * rr || lr < 0.75 * lrr || lr > 1.25 * lrr)
+            R.warn(m + ": cost does not scale with N like on the reference machine");
+        else R.note("sanity 2 ok: " + m);
+    }
+    // 4 + 5. the real loop: time must grow with 1 + OUTSIDE_WORK, and the summed results must be right
+    const LockEntry* rep = find_lock(reg, "std-mutex");
+    if (!rep && !sel.empty()) rep = sel[0];
+    try {
+        const long base = cfg_count(cfg.iters, cfg.N[1], 0, "iters", cfg.path);
+        const long cnt = std::max(100L, base / 5);
+        const int ows[3] = {0, 2, 8};
+        double t[3];
+        bool sum_ok = true;
+        for (int i = 0; i < 3; ++i) {
+            RunSpec rs;
+            rs.threads = 1;
+            rs.outside = ows[i];
+            rs.N = cfg.N[1];
+            rs.iters = cnt;
+            double best = 1e300;
+            for (int rr = 0; rr < 3; ++rr) {
+                const RunResult r = rep->fn(rs);
+                best = std::min(best, r.total_ms * 1e6 / static_cast<double>(cnt));
+                if (r.completed != static_cast<std::uint64_t>(cnt) ||
+                    r.sink != r.completed * static_cast<std::uint64_t>(1 + ows[i]) * (is_prime_plain(cfg.N[1]) ? 1u : 0u))
+                    sum_ok = false;
+            }
+            t[i] = best;
+        }
+        const double r2 = t[1] / t[0], r8 = t[2] / t[0];
+        const std::string m = std::string("real loop (") + rep->name + ", 1 thread): ns/iteration " + fmt(t[0]) + " / " +
+                              fmt(t[1]) + " / " + fmt(t[2]) + " for OUTSIDE_WORK 0/2/8, ratios " + fmt(r2, 2) + " / " +
+                              fmt(r8, 2) + " (expected 3 / 9)";
+        if (r2 < 3 * 0.85 || r2 > 3 * 1.15 || r8 < 9 * 0.85 || r8 > 9 * 1.15)
+            R.warn(m + ": the outside-work calls do not scale as expected (eliminated, hoisted or overhead-dominated)");
+        else R.note("sanity 3 ok: " + m);
+        if (!sum_ok) R.warn("the summed is_prime results or the completed counts of the real loop are wrong");
+        else R.note("sanity 4 ok: completed counts and summed results of the real loop are correct");
+    } catch (const std::exception& e) {
+        R.warn(std::string("real-loop checks skipped: ") + e.what());
+    }
+    // 6. pilot-style estimate for the FASTEST configuration (N small, OUTSIDE_WORK 0, one thread)
+    try {
+        RunSpec rs;
+        rs.threads = 1;
+        rs.outside = 0;
+        rs.N = cfg.N[0];
+        rs.iters = scaled(cfg_count(cfg.iters, cfg.N[0], 0, "iters", cfg.path), opt.iters_scale);
+        const RunResult r = rep->fn(rs);
+        const std::string m = "fastest configuration (N=" + std::to_string(cfg.N[0]) + ", OUTSIDE_WORK 0, 1 thread, " +
+                              std::to_string(rs.iters) + " iterations) runs " + fmt(r.total_ms) + " ms here (about " +
+                              std::to_string(cfg.target_ms) + " ms on the reference)";
+        if (opt.iters_scale == 1.0 && r.total_ms < kMinRunMs)
+            R.warn(m + ": shorter than " + fmt(kMinRunMs, 0) + " ms, timing resolution and start-up costs may matter; "
+                       "if it stays short on every fast platform, revise the count in the canonical config");
+        else R.note(m);
+    } catch (const std::exception& e) {
+        R.warn(std::string("fastest-configuration check skipped: ") + e.what());
+    }
+    // 7. baselines and pinning
+    {
+        std::string have;
+        for (const auto* e : sel) have += std::string(have.empty() ? "" : ", ") + e->name;
+        R.note("locks in this run: " + have);
+        for (const auto& u : unavailable_baselines()) R.note("not available: " + u);
+    }
+    return R;
+}
+
+static void save_platform_file(const PlatformInfo& pi, const BenchConfig& cfg, const std::string& id, const CheckReport& R) {
+    std::error_code ec;
+    std::filesystem::create_directories("results", ec);
+    std::ofstream f("results/platform_" + pi.label + ".txt");
+    if (!f) return;
+    f << "platform        " << pi.label << "\ncpu             " << pi.cpu << "\ncores           "
+      << (pi.phys > 0 ? std::to_string(pi.phys) : "unknown") << " physical / " << pi.hw << " logical\nos / kernel     "
+      << pi.os << " / " << pi.kernel << " (" << pi.arch << ")\ncompiler        " << pi.compiler << "\nflags           "
+      << pi.flags << "\npinned          " << (pi.pinned ? "yes: " + pi.cpu_list : std::string("no")) << "\nconfig          "
+      << cfg.path << " version " << cfg.version << ", id " << id << " (reference: " << cfg.reference << ")\n\n";
+    for (const auto& l : R.lines) f << l << "\n";
+}
+
+// ---- one-time pilot ---------------------------------------------------------
+static int run_pilot(const Options& opt, const PlatformInfo& pi, const std::vector<LockEntry>& reg,
+                     const std::vector<const LockEntry*>& sel) {
+    const LockEntry* rep = find_lock(reg, "std-mutex");
+    if (!rep) {
+        std::cerr << "pilot needs the std-mutex baseline\n";
+        return 1;
+    }
+    BenchConfig c;
+    c.path = "(pilot)";
+    c.version = 1;
+    c.target_ms = opt.target_ms;
+    c.ref_cpus = opt.pilot_cpus > 0 ? opt.pilot_cpus : pi.hw;
+    c.reps = 10;
+    c.warmup = 1;
+    c.reference = pi.label + ": " + pi.cpu + "; " + pi.compiler + "; " + pi.flags;
+    c.outside = {{"scale", {0, 2, 8}}, {"contention", {0, 1, 2, 4, 8, 16}}, {"cs", {0, 8}}, {"strong", {2}}, {"oversub", {0, 8}}};
+
+    std::cout << "============================================================\n";
+    std::cout << "Pilot (one-time, on the reference machine)\n";
+    std::cout << "============================================================\n";
+    std::cout << "Machine        : " << pi.label << ", " << pi.cpu << ", " << pi.compiler << ", " << pi.flags << "\n";
+    std::cout << "Representative : " << rep->name << ", 1 thread, the real benchmark loop\n";
+    std::cout << "Target         : " << c.target_ms << " ms for one uncontended thread; strong total = per-thread count x "
+              << c.ref_cpus << " (reference logical CPUs)\n\n";
+
+    // N for about 0.1 / 1 / 10 x pilot_ns (cost of is_prime is linear in N)
+    const double ns_per_d = measure_cs_ns(10007) / 10005.0;
+    const double targets[3] = {0.1 * opt.pilot_ns, opt.pilot_ns, 10.0 * opt.pilot_ns};
+    for (int i = 0; i < 3; ++i) {
+        c.N[i] = next_prime(std::max(5L, std::lround(targets[i] / ns_per_d)));
+        c.cs_ns[i] = measure_cs_ns(c.N[i]);
+        std::cout << "N " << (i == 0 ? "small " : i == 1 ? "medium" : "large ") << " = " << std::setw(5) << c.N[i] << "  is_prime "
+                  << fmt(c.cs_ns[i]) << " ns (target " << fmt(targets[i], 0) << ")\n";
+    }
+
+    // (N, OUTSIDE_WORK) pairs that the series use
+    std::set<std::pair<int, int>> pairs;
+    for (const char* s : {"scale", "contention", "oversub"})
+        for (int o : c.outside[s]) pairs.insert({c.N[1], o});
+    for (int i = 0; i < 3; ++i)
+        for (int o : c.outside["cs"]) pairs.insert({c.N[i], o});
+    for (int o : c.outside["strong"]) pairs.insert({c.N[1], o});
+    std::map<std::pair<int, int>, double> nsit;
+    std::cout << "\nReal-loop timings (batches >= 20 ms, median of 3):\n";
+    std::cout << "     N  outside  ns/iteration  spread   iters/thread  strong total  1-thread ms\n";
+    std::vector<std::string> warnings;
+    for (const auto& pr : pairs) {
+        double sp = 0;
+        const double ns = loop_ns_per_iter(*rep, pr.first, pr.second, &sp);
+        nsit[pr] = ns;
+        const long it = std::max(100L, round3(c.target_ms * 1e6 / ns));
+        c.iters[pr] = it;
+        std::string tot = "-";
+        if (std::count(c.outside["strong"].begin(), c.outside["strong"].end(), pr.second) && pr.first == c.N[1]) {
+            c.strong[pr] = round3(static_cast<double>(it) * c.ref_cpus);
+            tot = std::to_string(c.strong[pr]);
+        }
+        std::cout << std::setw(6) << pr.first << std::setw(9) << pr.second << std::setw(14) << fmt(ns) << std::setw(7)
+                  << fmt(sp * 100, 1) << "%" << std::setw(15) << it << std::setw(14) << tot << std::setw(13)
+                  << fmt(static_cast<double>(it) * ns / 1e6) << "\n";
+        if (sp > 0.05) warnings.push_back("timing spread above 5% for N=" + std::to_string(pr.first) + " OUTSIDE_WORK=" +
+                                          std::to_string(pr.second) + ": rerun the pilot on an idle machine");
+    }
+
+    // all locks must agree on the single-thread loop time, otherwise one count does not fit all of them
+    std::cout << "\nSingle-thread loop time per lock at N=" << c.N[1] << ", OUTSIDE_WORK 0 (relative to " << rep->name << "):\n";
+    const double base = nsit.at({c.N[1], 0});
+    for (const auto* e : sel) {
+        const double ns = loop_ns_per_iter(*e, c.N[1], 0);
+        std::cout << "  " << std::left << std::setw(15) << e->name << std::right << fmt(ns) << " ns  x" << fmt(ns / base, 3) << "\n";
+        if (ns / base > 1.05 || ns / base < 0.95)
+            warnings.push_back(std::string(e->name) + " differs by more than 5% from " + rep->name + " in the single-thread loop");
+    }
+
+    // projection of the worst case: a fully serialised run at 2x the reference CPUs; FIFO locks can be much slower
+    std::cout << "\nProjection at " << 2 * c.ref_cpus << " threads (2x oversubscription): serialised critical sections, and the\n"
+              << "worst case x" << fmt(kFifoOversubFactor, 0) << " seen for FIFO locks; cap per run " << opt.max_run_ms << " ms\n";
+    for (const auto& kv : c.iters) {
+        const double idx = (kv.first.first == c.N[0] ? c.cs_ns[0] : kv.first.first == c.N[1] ? c.cs_ns[1] : c.cs_ns[2]);
+        const double serial_ms = static_cast<double>(kv.second) * 2.0 * c.ref_cpus * idx / 1e6;
+        if (serial_ms * kFifoOversubFactor > static_cast<double>(opt.max_run_ms))
+            warnings.push_back("N=" + std::to_string(kv.first.first) + " OUTSIDE_WORK=" + std::to_string(kv.first.second) +
+                               ": projected worst case " + fmt(serial_ms * kFifoOversubFactor, 0) + " ms exceeds the cap");
+    }
+    std::cout << "  (no configuration exceeds the cap unless listed in the warnings below)\n";
+
+    // sanity checks on this machine with the new configuration
+    double cs[3] = {c.cs_ns[0], c.cs_ns[1], c.cs_ns[2]};
+    const CheckReport R = run_checks(c, opt, reg, sel, cs);
+    std::cout << "\nSanity checks:\n";
+    for (const auto& l : R.lines) std::cout << "  " << l << "\n";
+    for (const auto& w : warnings) std::cout << "WARNING: " << w << "\n";
+
+    // write the candidate config (never the canonical file itself)
+    std::error_code ec;
+    std::filesystem::create_directories("config", ec);
+    const std::string out = "config/pilot_" + pi.label + ".cfg";
+    std::ofstream f(out);
+    if (!f) {
+        std::cerr << "cannot write " << out << "\n";
+        return 1;
+    }
+    f << "# Canonical benchmark configuration. FROZEN: every platform of the comparison uses the same file.\n"
+         "# Produced by `bench_mutex --pilot` on the reference machine (candidate file: review, then copy to\n"
+         "# config/reference.cfg). Revise a count only when a configuration is impractical: edit it here, bump\n"
+         "# `version`, and rerun THAT configuration on every platform (--filter). See README, \"Fixed workload\".\n"
+         "version 1\n"
+         "reference " << c.reference << "\n"
+         "target_ms " << c.target_ms << "\n"
+         "reference_logical_cpus " << c.ref_cpus << "\n"
+         "repetitions " << c.reps << "\nwarmup " << c.warmup << "\n\n"
+         "# critical-section sizes: is_prime(N) duration on the reference machine in ns\n";
+    const char* nmn[3] = {"small", "medium", "large"};
+    for (int i = 0; i < 3; ++i) f << "n " << nmn[i] << " " << c.N[i] << " " << fmt(c.cs_ns[i]) << "\n";
+    f << "\n# OUTSIDE_WORK values per series\n";
+    for (const char* s : kSeriesNames) {
+        f << "outside " << s;
+        for (int o : c.outside[s]) f << " " << o;
+        f << "\n";
+    }
+    f << "\n# iterations PER THREAD (fixed-work series): N OUTSIDE_WORK count   # ns per loop iteration\n";
+    for (const auto& kv : c.iters)
+        f << "iters " << kv.first.first << " " << kv.first.second << " " << kv.second << "   # " << fmt(nsit[kv.first]) << " ns\n";
+    f << "\n# TOTAL iterations of the strong-scaling series (split across the threads): N OUTSIDE_WORK total\n";
+    for (const auto& kv : c.strong) f << "strong " << kv.first.first << " " << kv.first.second << " " << kv.second << "\n";
+    std::cout << "\nWrote candidate configuration: " << out << "\n";
+    return 0;
 }
 
 // ============================================================================
@@ -1175,29 +1664,79 @@ int main(int argc, char** argv) {
     std::sort(core_threads.begin(), core_threads.end());
     core_threads.erase(std::unique(core_threads.begin(), core_threads.end()), core_threads.end());
 
-    // ---- critical-section sizes (N): small / medium / large = about 0.1x / 1x / 10x --medium-ns
-    std::vector<int> Ns, Nt;
+    // ---- one-time pilot (reference machine only): does not need the canonical config ---------------
+    if (opt.pilot) return run_pilot(opt, pi, reg, sel);
+
+    // ---- canonical configuration ---------------------------------------
+    BenchConfig cfg;
     {
-        // cost of one loop iteration of is_prime, measured on a large prime
-        const double ns_per_d = measure_cs_ns(10007) / 10005.0;
-        for (double target : {0.1 * opt.medium_ns, opt.medium_ns, 10.0 * opt.medium_ns}) {
-            const int n = next_prime(std::max(5L, std::lround(target / ns_per_d)));
-            Nt.push_back(n);
-            if (std::find(Ns.begin(), Ns.end(), n) == Ns.end()) Ns.push_back(n);
+        std::string err;
+        if (!load_config(opt.config, cfg, err)) {
+            std::cerr << "[bench] " << err << "\n";
+            return 2;
         }
     }
-    std::vector<double> cs_of(Ns.size());
-    for (std::size_t i = 0; i < Ns.size(); ++i) {
-        if (!is_prime_plain(Ns[i]))
-            std::cerr << "[bench] warning: N=" << Ns[i]
-                      << " is not prime; is_prime returns early and the critical section is tiny\n";
-        cs_of[i] = measure_cs_ns(Ns[i]);
+    if (opt.reps < 0) opt.reps = cfg.reps;
+    if (opt.warmup < 0) opt.warmup = cfg.warmup;
+    std::string config_id;
+    {
+        std::ostringstream h;
+        h << cfg.norm << "reps " << opt.reps << "\nwarmup " << opt.warmup << "\nscale " << std::setprecision(17)
+          << opt.iters_scale << "\n";
+        for (const auto& e : reg) h << "lock " << e.name << " " << e.params << "\n";
+        if (opt.mode == "fairness") h << "duration_ms " << opt.duration_ms << "\n";
+        config_id = hex16(fnv1a(h.str()));
     }
 
-    if (opt.mode == "fairness") return run_fairness_mode(opt, pi, cpus, sel, core_threads, Nt.at(1), cs_of[std::find(Ns.begin(), Ns.end(), Nt.at(1)) - Ns.begin()]);
+    // ---- critical-section sizes (N): fixed, identical on every platform --------
+    // The durations are measured here and stored (cs_ns); they never change N or the iteration counts.
+    const int Nt[3] = {cfg.N[0], cfg.N[1], cfg.N[2]};
+    double cs_of[3];
+    for (int i = 0; i < 3; ++i) {
+        if (!is_prime_plain(Nt[i]))
+            std::cerr << "[bench] warning: N=" << Nt[i] << " is not prime; is_prime returns early and the critical section is tiny\n";
+        cs_of[i] = measure_cs_ns(Nt[i]);
+    }
+    auto cs_for = [&](int N) { return N == Nt[0] ? cs_of[0] : N == Nt[1] ? cs_of[1] : cs_of[2]; };
+
+    // ---- filter ---------------------------------------------------------
+    Filter flt;
+    for (const auto& kv : split(opt.filter, ',')) {
+        const auto eq = kv.find('=');
+        const std::string key = eq == std::string::npos ? "" : kv.substr(0, eq);
+        if (key != "n" && key != "outside" && key != "threads" && key != "series" && key != "mode") {
+            std::cerr << "--filter: unknown key in '" << kv << "' (n, outside, threads, series, mode)\n";
+            return 64;
+        }
+        for (std::string v : split(kv.substr(eq + 1), '|')) {
+            if (key == "n") {
+                const int idx = v == "small" ? 0 : v == "medium" ? 1 : v == "large" ? 2 : -1;
+                if (idx >= 0) v = std::to_string(Nt[idx]);
+            }
+            flt.k[key].insert(v);
+        }
+    }
+
+    if (opt.check) {
+        const CheckReport R = run_checks(cfg, opt, reg, sel, cs_of);
+        std::cout << "Platform check (" << pi.label << ", config " << cfg.path << " version " << cfg.version << ", id " << config_id << ")\n";
+        for (const auto& l : R.lines) std::cout << "  " << l << "\n";
+        save_platform_file(pi, cfg, config_id, R);
+        std::cout << "\n" << R.warnings.size() << " warning(s); saved results/platform_" << pi.label << ".txt\n";
+        return 0;
+    }
+
+    if (opt.mode == "fairness") {
+        if (!opt.dry_run) {
+            const CheckReport R = run_checks(cfg, opt, reg, sel, cs_of);
+            for (const auto& w : R.warnings) std::cout << "WARNING: " << w << "\n";
+            save_platform_file(pi, cfg, config_id, R);
+        }
+        return run_fairness_mode(opt, pi, cpus, sel, core_threads, Nt[1], cs_of[1], flt, config_id);
+    }
 
     // ---- plan ---------------------------------------------------------
-    struct Config {
+    struct Planned {
         std::string mode;
         int threads, outside, N;
         double cs_ns;
@@ -1205,44 +1744,38 @@ int main(int argc, char** argv) {
         std::string series;  // core | oversub (threads above the logical CPUs)
         std::string exp;     // experiment series this configuration belongs to ('+' joined)
     };
-    std::vector<Config> configs;
-    std::map<int, double> cs_by_N;
-    for (std::size_t i = 0; i < Ns.size(); ++i) cs_by_N[Ns[i]] = cs_of[i];
+    std::vector<Planned> configs;
 
+    // Counts come from the two frozen tables: 'iters' (per thread) for fixed-work, 'strong' (total) for strong scaling.
     auto add = [&](const std::string& exp, const std::string& mode, int thr, int out, int N) {
+        if (!flt.ok(exp, mode, thr, out, N)) return;
         for (auto& c : configs)
             if (c.mode == mode && c.threads == thr && c.outside == out && c.N == N) {
                 if (("+" + c.exp + "+").find("+" + exp + "+") == std::string::npos) c.exp += "+" + exp;
                 return;
             }
-        Config c;
+        Planned c;
         c.mode = mode;
         c.threads = thr;
         c.outside = out;
         c.N = N;
-        c.cs_ns = cs_by_N.at(N);
-        const double per_iter_ns = (1.0 + out) * c.cs_ns;
-        long auto_iters = static_cast<long>(opt.target_ms * 1e6 / per_iter_ns);
-        auto_iters = std::min(20'000'000L, std::max(100L, auto_iters));
-        c.iters = opt.iters > 0 ? opt.iters : auto_iters;
-        c.total = opt.total > 0 ? opt.total : auto_iters * pi.hw;
-        c.total = std::max<long>(c.total, thr);
+        c.cs_ns = cs_for(N);
+        c.iters = 0;
+        c.total = 0;
+        if (mode == "strong") c.total = std::max<long>(scaled(cfg_count(cfg.strong, N, out, "strong", cfg.path), opt.iters_scale), thr);
+        else c.iters = scaled(cfg_count(cfg.iters, N, out, "iters", cfg.path), opt.iters_scale);
         c.series = thr > pi.hw ? "oversub" : "core";
         c.exp = exp;
         configs.push_back(c);
     };
 
-    int N_med = 0;
-    {
-        // N values of the 0.1 / medium / 10 us critical sections (calibrated once, above)
-        const int N_small = Nt.at(0), N_large = Nt.at(2);
-        N_med = Nt.at(1);
-
+    const int N_med = Nt[1];
+    try {
         std::set<std::string> want;
         for (const auto& t : split(opt.series, ',')) {
             if (t == "all") {
-                for (const char* n : {"scale", "contention", "cs", "strong", "oversub"}) want.insert(n);
-            } else if (t == "scale" || t == "contention" || t == "cs" || t == "strong" || t == "oversub") {
+                for (const char* n : kSeriesNames) want.insert(n);
+            } else if (std::find(std::begin(kSeriesNames), std::end(kSeriesNames), t) != std::end(kSeriesNames)) {
                 want.insert(t);
             } else {
                 std::cerr << "Unknown series '" << t << "' (scale, contention, cs, strong, oversub, all)\n";
@@ -1255,20 +1788,28 @@ int main(int argc, char** argv) {
         if (pi.phys > 0 && pi.phys < pi.hw) t3.push_back(pi.phys);
         std::sort(t3.begin(), t3.end());
         if (want.count("scale"))
-            for (int out : {0, 2, 8})
+            for (int out : cfg.outside["scale"])
                 for (int t : t_scale) add("scale", "fixed", t, out, N_med);
         if (want.count("contention"))
-            for (int out : {0, 1, 2, 4, 8, 16})
+            for (int out : cfg.outside["contention"])
                 for (int t : t3) add("contention", "fixed", t, out, N_med);
         if (want.count("cs"))
-            for (int n : {N_small, N_med, N_large})
-                for (int out : {0, 8})
+            for (int n : Nt)
+                for (int out : cfg.outside["cs"])
                     for (int t : t3) add("cs", "fixed", t, out, n);
         if (want.count("strong"))
-            for (int t : t_scale) add("strong", "strong", t, 2, N_med);
+            for (int out : cfg.outside["strong"])
+                for (int t : t_scale) add("strong", "strong", t, out, N_med);
         if (want.count("oversub"))
-            for (int out : {0, 8})
+            for (int out : cfg.outside["oversub"])
                 for (int t : {pi.hw, 2 * pi.hw}) add("oversub", "fixed", t, out, N_med);
+    } catch (const std::exception& e) {
+        std::cerr << "[bench] " << e.what() << "\n";
+        return 2;
+    }
+    if (configs.empty()) {
+        std::cerr << "[bench] the series and filter leave no configuration to run\n";
+        return 64;
     }
 
     const long runs_per_cfg = static_cast<long>(sel.size()) * (opt.reps + opt.warmup);
@@ -1276,16 +1817,23 @@ int main(int argc, char** argv) {
     std::cout << "Mutex lock benchmark\n";
     std::cout << "============================================================\n";
     print_platform(pi, sel);
+    std::cout << "Config         : " << cfg.path << " version " << cfg.version << ", id " << config_id << " (reference: " << cfg.reference << ")\n";
+    if (opt.iters_scale != 1.0)
+        std::cout << "WARNING: SMOKE RUN: iteration counts scaled by " << opt.iters_scale
+                  << "; rows are marked and excluded from the analysis.\n";
+    if (!opt.filter.empty()) std::cout << "Filter         : " << opt.filter << "\n";
     {
         std::map<std::string, int> per;
         for (const auto& c : configs)
             for (const auto& t : split(c.exp, '+')) ++per[t];
         std::cout << "Series         : ";
         bool first = true;
-        for (const char* n : {"scale", "contention", "cs", "strong", "oversub"})
+        for (const char* n : kSeriesNames)
             if (per.count(n)) { std::cout << (first ? "" : ", ") << n << " (" << per[n] << " configs)"; first = false; }
         std::cout << "\n";
-        std::cout << "Medium N       : " << N_med << " (" << std::fixed << std::setprecision(0) << cs_by_N.at(N_med) << " ns critical section)\n";
+        std::cout << "Workload       : fixed N and iteration counts from the canonical config (identical on every platform)\n";
+        std::cout << "Medium N       : " << N_med << " (" << std::fixed << std::setprecision(0) << cs_for(N_med) << " ns critical section here, "
+                  << cfg.cs_ns[1] << " ns on the reference)\n";
     }
     {
         std::set<int> th;
@@ -1298,7 +1846,7 @@ int main(int argc, char** argv) {
         std::cout << "OUTSIDE_WORK   : ";
         for (int o : ows) std::cout << o << " ";
         std::cout << "\nN (cs length)  : ";
-        for (int n : nn) std::cout << n << " (" << std::fixed << std::setprecision(0) << cs_by_N.at(n) << " ns)  ";
+        for (int n : nn) std::cout << n << " (" << std::fixed << std::setprecision(0) << cs_for(n) << " ns)  ";
         std::cout << "\n";
     }
     std::cout << "Mode / reps    : " << "per series" << " / " << opt.reps << " (+" << opt.warmup << " warm-up)\n";
@@ -1311,6 +1859,11 @@ int main(int argc, char** argv) {
     if (pi.hw >= 2 && !pi.pinned)
         std::cout << "Note: threads are not pinned; use --pin for steadier numbers (Linux/Windows).\n";
 #endif
+    {
+        const CheckReport R = run_checks(cfg, opt, reg, sel, cs_of);
+        for (const auto& w : R.warnings) std::cout << "WARNING: " << w << "\n";
+        save_platform_file(pi, cfg, config_id, R);
+    }
 
     // ---- CSV ----------------------------------------------------------
     std::ofstream csv;
@@ -1320,7 +1873,7 @@ int main(int argc, char** argv) {
     int invalid_runs = 0, timeout_runs = 0;
     std::size_t cfg_no = 0;
 
-    for (const Config& c : configs) {
+    for (const Planned& c : configs) {
         ++cfg_no;
         RunSpec rs;
         rs.threads = c.threads;
@@ -1364,7 +1917,7 @@ int main(int argc, char** argv) {
                     << (rs.strong ? c.total : c.iters * c.threads) << ',' << rep << ',' << status << ','
                     << std::setprecision(4) << r.total_ms << ',' << r.region_ms << ',' << r.finish_min_ms << ','
                     << r.finish_max_ms << ',' << r.completed << ',' << expected << ',' << std::setprecision(4)
-                    << mops << ',' << meta_columns(pi) << ',' << q(sel[li]->params) << ',' << c.exp << "\n";
+                    << mops << ',' << meta_columns(pi) << ',' << q(sel[li]->params) << ',' << c.exp << ',' << config_id << ',' << std::setprecision(6) << opt.iters_scale << "\n";
                 csv.flush();
             }
         };

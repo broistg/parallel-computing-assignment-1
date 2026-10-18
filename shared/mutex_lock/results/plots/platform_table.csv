@@ -1,0 +1,2 @@
+platform,cpu_model,os,compiler,usable_cpus,physical_cores,pinned,flags,cs_ns_medium,cs_vs_reference,config_id,rows,timeouts,locks
+tiendat-wsl,AMD Ryzen 5 6600H with Radeon Graphics,Linux,gcc 15.2.0,12,6,1,-std=c++17 -O2 -Wall -Wextra -pthread,1202.8,1.22,8a9add3e62387af8,4700,0,mcs pthread-mutex pthread-spin std-mutex tas tas-pause ticket ticket-prop ttas ttas-pause

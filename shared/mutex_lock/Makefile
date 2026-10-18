@@ -5,9 +5,11 @@
 #   results/   everything the programs write: CSV files and plots/
 #
 #   make                                           build test_correctness and bench_mutex into build/
-#   make test | quick | control | tsan | mutate    correctness targets
-#   make bench-quick | bench | bench-fair | analyze   benchmark targets (OMP=1 adds the OpenMP baselines)
-#   make clean                                     remove build/ (results/ is kept; make distclean removes it too)
+#   make test | test-quick | test-control | test-tsan | test-mutate        correctness targets
+#   make bench-check | bench-smoke      platform report + sanity checks (warn only); tiny end-to-end run
+#   make bench-quick | bench | bench-fair | bench-analyze   benchmark targets (OMP=1 adds the OpenMP baselines)
+#   make bench-pilot                    ONE-TIME, reference machine: writes a candidate config/pilot_<platform>.cfg
+#   make clean                          remove build/ (results/ is kept; make distclean removes it too)
 
 CXX      ?= g++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pthread
@@ -34,22 +36,22 @@ $(BIN)/test_correctness: $(SRC)/test_correctness.cpp $(SRC)/lock.h | $(BIN)
 test: $(BIN)/test_correctness
 	$(BIN)/test_correctness
 
-quick: $(BIN)/test_correctness
+test-quick: $(BIN)/test_correctness
 	$(BIN)/test_correctness --quick
 
 # Harness sensitivity check: lock_none MUST be detected as broken
-control: $(BIN)/test_correctness
+test-control: $(BIN)/test_correctness
 	$(BIN)/test_correctness --control
 
 # ThreadSanitizer build. Slow by nature, and plain TAS (no backoff) livelocks under
 # TSan with many threads (see README), so the thread count is capped; races are
 # detected independently of how many threads run.
-tsan: $(SRC)/test_correctness.cpp $(SRC)/lock.h | $(BIN)
+test-tsan: $(SRC)/test_correctness.cpp $(SRC)/lock.h | $(BIN)
 	$(CXX) -std=c++17 -O1 -g -fsanitize=thread -pthread $< -o $(BIN)/test_tsan
 	$(BIN)/test_tsan --quick --scale=0.1 --threads=1,2,4
 
 # Mutation test: release stores weakened to relaxed. Failures / TSan races are EXPECTED.
-mutate: $(SRC)/test_correctness.cpp $(SRC)/lock.h | $(BIN)
+test-mutate: $(SRC)/test_correctness.cpp $(SRC)/lock.h | $(BIN)
 	$(CXX) -std=c++17 -O1 -g -fsanitize=thread -DLOCK_MUTATE_RELAXED_RELEASE -pthread $< -o $(BIN)/test_mutate
 	-$(BIN)/test_mutate --quick --scale=0.1 --threads=2,4 --lock=tas,ttas,ticket,mcs
 
@@ -65,6 +67,19 @@ $(BIN)/bench_mutex_omp: $(SRC)/bench_mutex.cpp $(SRC)/lock.h | $(BIN)
 	$(CXX) $(CXXFLAGS) -fopenmp -DUSE_OPENMP -DBENCH_FLAGS='"$(CXXFLAGS) -fopenmp"' $< -o $@ $(LDFLAGS)
 
 BENCH_BIN := $(BIN)/bench_mutex$(if $(OMP),_omp,)
+
+# The workload (N, OUTSIDE_WORK sets, iteration counts) is frozen in config/reference.cfg and identical on every platform.
+# check: platform report and sanity checks (warnings only) -> results/platform_<platform>.txt
+bench-check: $(BENCH_BIN) | $(RES)
+	$(BENCH_BIN) --check --pin --platform=$(PLATFORM) $(BENCHFLAGS)
+
+# smoke: tiny end-to-end run (1% of the iterations, 2 repetitions) -> results/smoke_<platform>.csv; rows are marked and never analysed
+bench-smoke: $(BENCH_BIN) | $(RES)
+	$(BENCH_BIN) --pin --platform=$(PLATFORM) --csv=$(RES)/smoke_$(PLATFORM).csv --iters-scale=0.01 --reps=2 --warmup=0 $(BENCHFLAGS)
+
+# pilot: ONE-TIME, on the reference machine only; never edits config/reference.cfg (review the candidate, then copy it)
+bench-pilot: $(BENCH_BIN)
+	$(BENCH_BIN) --pilot --pin --platform=$(PLATFORM) $(BENCHFLAGS)
 
 # The benchmark runs five experiment series (scale, contention, cs, strong, oversub); see README.
 # bench-quick: shorter run, all five series, 5 repetitions -> results/quick_<platform>.csv (not pooled with bench)
@@ -82,7 +97,7 @@ bench-fair: $(BENCH_BIN) | $(RES)
 
 # Summaries + figures from every results/bench_*.csv (and results/fair_*.csv) -> results/plots/
 # (quick data: python3 src/analyze_bench.py results/quick_*.csv --out results/plots_quick)
-analyze:
+bench-analyze:
 	@if ls $(RES)/bench_*.csv >/dev/null 2>&1; then python3 $(SRC)/analyze_bench.py $(RES)/bench_*.csv --out $(RES)/plots; else echo "no results/bench_*.csv yet: run make bench"; fi
 	@if ls $(RES)/fair_*.csv >/dev/null 2>&1; then python3 $(SRC)/analyze_fairness.py $(RES)/fair_*.csv --out $(RES)/plots; fi
 
@@ -92,4 +107,4 @@ clean:
 distclean: clean
 	rm -rf $(RES)
 
-.PHONY: all test quick control tsan mutate bench-quick bench bench-fair analyze clean distclean
+.PHONY: all test test-quick test-control test-tsan test-mutate bench-check bench-smoke bench-pilot bench-quick bench bench-fair bench-analyze clean distclean

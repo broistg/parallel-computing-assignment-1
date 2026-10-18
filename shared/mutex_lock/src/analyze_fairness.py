@@ -18,6 +18,8 @@ import os
 
 import pandas as pd
 
+import config_check
+
 KEYS = ["platform", "series", "N", "outside_work", "threads", "lock"]
 FAMILY_ORDER = ["tas", "ttas", "ticket", "mcs", "std-mutex", "pthread-mutex", "pthread-spin", "omp"]
 COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
@@ -150,8 +152,10 @@ def main():
     ap.add_argument("csv", nargs="+")
     ap.add_argument("--out", default="results/plots")
     ap.add_argument("--no-plots", action="store_true")
+    ap.add_argument("--config", default="config/reference.cfg", help="canonical configuration the rows are checked against")
     a = ap.parse_args()
     df = pd.concat([pd.read_csv(p) for p in a.csv], ignore_index=True)
+    df = config_check.validate_fairness(df, config_check.load_cfg(a.config))
     bad = df[df["status"] != "ok"]
     print(f"{len(df)} runs from {len(a.csv)} file(s)")
     if len(bad):

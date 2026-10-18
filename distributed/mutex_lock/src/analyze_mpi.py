@@ -292,6 +292,14 @@ def main():
     ap.add_argument("--no-plots", action="store_true")
     a = ap.parse_args()
     df = pd.concat([pd.read_csv(p) for p in a.csv], ignore_index=True)
+    if "config_id" not in df.columns:
+        raise SystemExit("These CSV files lack the config_id column (written by an older version); rerun the benchmark.")
+    ids = sorted(df["config_id"].unique())
+    if len(ids) > 1:
+        print("WARNING: more than one config_id (different rounds, busy work, trials, warm-up, duration or lock parameters):")
+        print(df.groupby("config_id")["lock"].agg(lambda x: f"{len(x)} rows").to_string())
+    else:
+        print(f"config_id {ids[0]} on all rows")
     bad = df[df["valid"] != 1]
     if len(bad):
         print(f"WARNING: {len(bad)} invalid rows (counter mismatch) excluded")

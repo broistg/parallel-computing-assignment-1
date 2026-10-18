@@ -1,0 +1,19 @@
+platform        tiendat-wsl
+cpu             AMD Ryzen 5 6600H with Radeon Graphics
+cores           6 physical / 12 logical
+os / kernel     Linux / Linux 6.18.33.1-microsoft-standard-WSL2 (x86-64)
+compiler        gcc 15.2.0
+flags           -std=c++17 -O2 -Wall -Wextra -pthread
+pinned          yes: 0 2 4 6 8 10 1 3 5 7 9 11
+config          config/reference.cfg version 1, id 489949403c81b9b8 (reference: tiendat-wsl: AMD Ryzen 5 6600H with Radeon Graphics; gcc 15.2.0; -std=c++17 -O2 -Wall -Wextra -pthread)
+
+is_prime(79) [small]: 125.1 ns on this machine, 103.0 ns on the reference (x1.21)
+is_prime(739) [medium]: 1194.2 ns on this machine, 986.3 ns on the reference (x1.21)
+is_prime(7393) [large]: 11978.0 ns on this machine, 9895.5 ns on the reference (x1.21)
+sanity 1 ok: batch of 2k calls / batch of k calls = 2.00 (expected 2)
+sanity 2 ok: cost ratio medium/small 9.54 (reference 9.58), large/medium 10.03 (reference 10.03)
+sanity 3 ok: real loop (std-mutex, 1 thread): ns/iteration 1002.5 / 2968.9 / 8880.4 for OUTSIDE_WORK 0/2/8, ratios 2.96 / 8.86 (expected 3 / 9)
+sanity 4 ok: completed counts and summed results of the real loop are correct
+fastest configuration (N=79, OUTSIDE_WORK 0, 1 thread, 475000 iterations) runs 49.4 ms here (about 50 ms on the reference)
+locks in this run: tas, tas-pause, ttas, ttas-pause, ticket, ticket-prop, mcs, std-mutex, pthread-mutex, pthread-spin
+not available: omp-lock, omp-critical (not built with OpenMP; optional, make OMP=1)

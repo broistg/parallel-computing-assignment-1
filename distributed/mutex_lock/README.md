@@ -26,17 +26,23 @@ inside the critical section (completed before release), so a broken lock produce
 ## Usage
 ```
 make test NP=4         # full suite, rank counts 1,2,4 (sub-communicators)
-make quick NP=4
-make control NP=4      # negative control: lock_none MUST be detected as broken
+make test-quick NP=4
+make test-control NP=4      # negative control: lock_none MUST be detected as broken
 mpirun -n 2 build/test_correctness_mpi --help
 make bench-quick NP=8  # shorter run: all series, 5 trials -> results/quick_mpi.csv
 make bench NP=8        # the run for the report: all series, 10 trials -> results/bench_mpi.csv
 make bench-fair NP=8   # fairness experiment -> results/fair_mpi.csv
-make analyze           # tables / plots per series (median, IQR) into results/plots/
+make bench-analyze           # tables / plots per series (median, IQR) into results/plots/
 ```
 Extra options go through `BENCHFLAGS`, e.g. `make bench NP=8 BENCHFLAGS="--trials=5 --series=scale,oversub"`.
 
 ## Benchmark
+* **Fixed workload.** As in the shared-memory benchmark, the workload is the same on every platform: rounds per rank
+  (`--ops`), busy work (`--cs-work`), trials and warm-up are fixed defaults and are never calibrated per machine.
+  Every CSV row carries `config_id`, a fingerprint of these values, the duration (fairness) and the lock parameters;
+  `analyze_mpi.py` warns when ids differ between files. The strong-scaling total is `ops x R_log`, where R_log is the
+  rank count of the machine, so it differs between machines with a different logical-CPU count (pass `--ops` to
+  keep it equal when that matters).
 * **Series** (`--series=scale,contention,cs,strong,oversub|all`; the same five as the shared-memory
   benchmark). R_log = min(NP, logical CPUs) on one node, R_phys = physical cores. One unit of OUTSIDE_WORK k is
   `k x` the medium critical-section work (50 busy iterations by default, not calibrated: RMA round trips dominate).
