@@ -1,0 +1,6 @@
+services:
+  bt2:
+    image: bt2
+    build:
+      context: .
+      dockerfile: ./Dockerfile
