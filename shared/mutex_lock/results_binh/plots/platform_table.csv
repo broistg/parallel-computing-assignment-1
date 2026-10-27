@@ -1,0 +1,2 @@
+platform,cpu_model,os,compiler,usable_cpus,physical_cores,pinned,flags,cs_ns_medium,cs_vs_reference,config_id,rows,timeouts,locks
+b0114460c077,Intel(R) Core(TM) i5-7200U CPU @ 2.50GHz,Linux,gcc 16.2.0,4,2,1,-std=c++17 -O2 -Wall -Wextra -pthread,1398.6,1.42,4be2583e6d4dc11e,247,0,mcs pthread-mutex pthread-spin std-mutex tas tas-pause ticket ticket-prop ttas ttas-pause
