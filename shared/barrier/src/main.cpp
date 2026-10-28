@@ -8,12 +8,13 @@
 #include <functional>
 #include <omp.h>
 #include <memory>
+#include <format>
 
 using namespace std::chrono;
 
 /* Configurations */
 int NUM_OF_THREADS = 2;
-#define NUM_OF_ITERS 10000
+int NUM_OF_ITERS = 100;
 #define N 10007
 
 /* Shared variables */
@@ -105,11 +106,14 @@ int main(int argc, char* argv[]) {
         sense_barrier = std::make_unique<Barrier>(NUM_OF_THREADS);
         std_barrier = std::make_unique<std::barrier<>>(NUM_OF_THREADS);
 
-        std::cout<< "Running with " << NUM_OF_THREADS << " threads and " << NUM_OF_ITERS << " interations\n";
-        std::cout<< "Sense barrier elasp time: " << bench_barrier(thread_sense_barrier_entry) << " sec\n";
-        std::cout<< "C++ 20 barrier elasp time: " << bench_barrier(thread_std_barrier_entry) << " sec\n";
-        std::cout<< "Pthread libary barrier elasp time: " << bench_barrier(thread_pthread_barrier_entry) << " sec\n";
-        std::cout<< "OpenMP barrier elasp time: " << bench_OpenPM_barrier() << " sec\n";
+        std::cout<< NUM_OF_THREADS << " threads \n";
+        std::cout<< std::format("{:<10}{:<10}{:<10}{}\n", 100, 1000, 10000, 100000);
+        for (int j = 100; j <= 100000; j*=10) {
+            NUM_OF_ITERS = j;
+            std::cout<< bench_barrier(thread_sense_barrier_entry) << " ";
+        }
+        std::cout<< "\n"; 
+        std::cout<< "--------------------\n";
     }
 	return 0;
 }
