@@ -100,9 +100,9 @@ double bench_OpenPM_barrier() {
 
 int main(int argc, char* argv[]) {
     std::cout<< "Running with " << NUM_OF_THREADS << " threads and " << NUM_OF_ITERS << " interations\n";
-    // std::cout<< "Sense barrier elasp time: " << bench_barrier(thread_sense_barrier_entry) << "\n";
-    // std::cout<< "C++ 20 barrier elasp time: " << bench_barrier(thread_std_barrier_entry) << "\n";
-    // std::cout<< "Pthread libary barrier elasp time: " << bench_barrier(thread_pthread_barrier_entry) << "\n";
-    // std::cout<< "OpenMP barrier elasp time: " << bench_OpenPM_barrier() << "\n";
+    std::cout<< "Sense barrier elasp time: " << bench_barrier(thread_sense_barrier_entry) << "\n";
+    std::cout<< "C++ 20 barrier elasp time: " << bench_barrier(thread_std_barrier_entry) << "\n";
+    std::cout<< "Pthread libary barrier elasp time: " << bench_barrier(thread_pthread_barrier_entry) << "\n";
+    std::cout<< "OpenMP barrier elasp time: " << bench_OpenPM_barrier() << "\n";
     return 0;
 }

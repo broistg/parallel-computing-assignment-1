@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
         std_barrier = std::make_unique<std::barrier<>>(NUM_OF_THREADS);
 
         std::cout<< NUM_OF_THREADS << " threads \n";
-        std::cout<< std::format("{:<10}{:<10}{:<10}{}\n", 100, 1000, 10000, 100000);
+        std::cout<< std::format("{:<10}{:<9}{:<8}{}\n", 100, 1000, 10000, 100000);
         for (int j = 100; j <= 100000; j*=10) {
             NUM_OF_ITERS = j;
             std::cout<< bench_barrier(thread_sense_barrier_entry) << " ";
