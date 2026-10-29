@@ -9,12 +9,15 @@ Dự án hiện thực và kiểm thử cơ chế đồng bộ rào cản (**Bar
 
 ## Cấu trúc thư mục
 .
-├── Dockerfile              # Dockerfile để build và chạy trong môi trường đồng nhất
-├── barrier.cpp             # Chứa mã nguồn của giải thuật reversing-sense barrier
-├── test_correctness.cpp    # Kiểm tra tính đúng đắn của Barrier (logic chặn, reset chu kỳ)
-├── test_progress.cpp       # Kiểm tra tránh deadlock / đảm bảo luồng tiếp tục tiến trình
-├── benchmark.cpp                # Đo lường hiệu năng và độ trễ dưới tải luồng cao
-└── README.md
+├──src
+    ├── Dockerfile              # Dockerfile để build và chạy trong môi trường đồng nhất
+    ├── barrier.cpp             # Chứa mã nguồn của giải thuật reversing-sense barrier
+    ├── test_correctness.cpp    # Kiểm tra tính đúng đắn của Barrier (logic chặn, reset chu kỳ)
+    ├── test_progress.cpp       # Kiểm tra tránh deadlock / đảm bảo luồng tiếp tục tiến trình
+    ├── benchmark.cpp           # Đo lường hiệu năng và độ trễ dưới tải luồng cao
+├──results
+    ├── bench_performance.csv   # File csv chứa dữ liệu thời gian chạy (sec) của mỗi thành viên
+    ├── compare_library.csv     # File csv chứa dữ liệu thời gian chạy (sec) của các thư viện
 
 ## Hướng dẫn chạy
 
