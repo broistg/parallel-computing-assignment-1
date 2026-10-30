@@ -1,0 +1,11 @@
+{
+  "device_folder": "dangnhh5",
+  "hostname": "DangNguyens-MacBook-Air.local",
+  "cpu_model": "Apple M3",
+  "logical_cpus": 8,
+  "os": "macOS 15.6.1",
+  "memory_bytes": 17179869184,
+  "memory_gib": 16.0,
+  "arch": "arm64",
+  "platform": "macOS-15.6.1-arm64-arm-64bit-Mach-O"
+}
