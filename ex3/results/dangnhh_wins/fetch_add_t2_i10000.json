@@ -1,0 +1,12 @@
+{
+  "hostname": "DESKTOP-RNMMHOP",
+  "cpu_model": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "os": "Windows 11 (10.0.26300)",
+  "logical_cpus": 28,
+  "memory_bytes": 16936079360,
+  "threads": 2,
+  "increments_per_thread": 10000,
+  "impl": "fetch_add",
+  "seconds": 0.000764,
+  "total_increments": 20000
+}

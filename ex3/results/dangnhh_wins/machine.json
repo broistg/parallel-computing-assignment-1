@@ -1,0 +1,11 @@
+{
+  "device_folder": "dangnhh_wins",
+  "hostname": "DESKTOP-RNMMHOP",
+  "cpu_model": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "logical_cpus": 28,
+  "os": "Windows 11 (10.0.26300)",
+  "memory_bytes": 16936079360,
+  "memory_gib": 15.77,
+  "arch": "AMD64",
+  "platform": "Windows-11-10.0.26300-SP0"
+}
