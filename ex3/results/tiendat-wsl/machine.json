@@ -4,7 +4,7 @@
   "cpu_model": "AMD Ryzen 5 6600H with Radeon Graphics",
   "logical_cpus": 12,
   "os": "Ubuntu 26.04.1 LTS",
-  "memory_bytes": 7959359488,
+  "memory_bytes": 7959367680,
   "memory_gib": 7.41,
   "arch": "x86_64",
   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.43"

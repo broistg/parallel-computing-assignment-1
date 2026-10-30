@@ -1,0 +1,12 @@
+{
+  "hostname": "LAPTOP-NITRO-TIENDAT",
+  "cpu_model": "AMD Ryzen 5 6600H with Radeon Graphics",
+  "os": "Ubuntu 26.04.1 LTS",
+  "logical_cpus": 12,
+  "memory_bytes": 7959367680,
+  "threads": 8,
+  "increments_per_thread": 10000,
+  "impl": "cas",
+  "seconds": 0.001019,
+  "total_increments": 80000
+}
