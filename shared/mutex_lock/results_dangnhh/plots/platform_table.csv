@@ -1,0 +1,2 @@
+platform,cpu_model,os,compiler,usable_cpus,physical_cores,pinned,flags,cs_ns_medium,cs_vs_reference,config_id,rows,timeouts,locks
+dangnnh,Apple M3,macOS,clang 17.0.0 (clang-1700.6.3.2),8,8,0,-std=c++17 -O2 -Wall -Wextra -pthread,371.1,0.38,59b260f1d726ca77,2880,0,mcs pthread-mutex std-mutex tas tas-pause ticket ticket-prop ttas ttas-pause
