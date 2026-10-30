@@ -1,3 +1,3 @@
 platform,cpu_model,os,compiler,usable_cpus,physical_cores,pinned,flags,cs_ns_medium,cs_vs_reference,config_id,rows,timeouts,locks
-dangnnh,Apple M3,macOS,clang 17.0.0 (clang-1700.6.3.2),8,8,0,-std=c++17 -O2 -Wall -Wextra -pthread,371.1,0.38,59b260f1d726ca77,2880,0,mcs pthread-mutex std-mutex tas tas-pause ticket ticket-prop ttas ttas-pause
+dangnhh_wins,"Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",Windows,gcc 16.1.0,28,20,1,-std=c++17 -O2 -Wall -Wextra -pthread,831.1,0.84,d9b5a29be4881eed,4080,25,mcs std-mutex tas tas-pause ticket ticket-prop ttas ttas-pause
 tiendat-wsl,AMD Ryzen 5 6600H with Radeon Graphics,Linux,gcc 15.2.0,12,6,1,-std=c++17 -O2 -Wall -Wextra -pthread,1202.8,1.22,8a9add3e62387af8,4700,0,mcs pthread-mutex pthread-spin std-mutex tas tas-pause ticket ticket-prop ttas ttas-pause

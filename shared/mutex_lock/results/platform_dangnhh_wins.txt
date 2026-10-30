@@ -1,0 +1,21 @@
+platform        dangnhh_wins
+cpu             Intel64 Family 6 Model 183 Stepping 1, GenuineIntel
+cores           20 physical / 28 logical
+os / kernel     Windows / unknown (x86-64)
+compiler        gcc 16.1.0
+flags           -std=c++17 -O2 -Wall -Wextra -pthread
+pinned          yes: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27
+config          config/reference.cfg version 1, id c396053072b09c03 (reference: tiendat-wsl: AMD Ryzen 5 6600H with Radeon Graphics; gcc 15.2.0; -std=c++17 -O2 -Wall -Wextra -pthread)
+
+is_prime(79) [small]: 87.6 ns on this machine, 103.0 ns on the reference (x0.85)
+is_prime(739) [medium]: 841.0 ns on this machine, 986.3 ns on the reference (x0.85)
+is_prime(7393) [large]: 8487.0 ns on this machine, 9895.5 ns on the reference (x0.86)
+sanity 1 ok: batch of 2k calls / batch of k calls = 2.00 (expected 2)
+sanity 2 ok: cost ratio medium/small 9.60 (reference 9.58), large/medium 10.09 (reference 10.03)
+sanity 3 ok: real loop (std-mutex, 1 thread): ns/iteration 857.7 / 2563.5 / 7564.2 for OUTSIDE_WORK 0/2/8, ratios 2.99 / 8.82 (expected 3 / 9)
+sanity 4 ok: completed counts and summed results of the real loop are correct
+fastest configuration (N=79, OUTSIDE_WORK 0, 1 thread, 475000 iterations) runs 42.2 ms here (about 50 ms on the reference)
+locks in this run: tas, tas-pause, ttas, ttas-pause, ticket, ticket-prop, mcs, std-mutex
+not available: pthread-mutex (no pthreads on Windows)
+not available: pthread-spin (pthread_spinlock_t is only used on Linux; macOS has none)
+not available: omp-lock, omp-critical (not built with OpenMP; optional, make OMP=1)
