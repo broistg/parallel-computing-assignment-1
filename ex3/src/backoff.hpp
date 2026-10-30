@@ -2,6 +2,13 @@
 
 #include <thread>
 
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 // Wait a little longer after each failed attempt.
 // Used by the CAS counter so threads stop hammering the same cache line.
 class ExponentialBackoff {
@@ -13,14 +20,15 @@ class ExponentialBackoff {
     if (spins_ < kMaxSpins) {
       spins_ *= 2;
     } else {
-      // Cap the spin, then give the core to another thread.
       std::this_thread::yield();
     }
   }
 
  private:
   static void cpu_pause() {
-#if defined(__x86_64__) || defined(__i386__)
+#if defined(_WIN32)
+    YieldProcessor();
+#elif defined(__x86_64__) || defined(__i386__)
     __builtin_ia32_pause();
 #elif defined(__aarch64__) || defined(__arm__)
     asm volatile("yield" ::: "memory");

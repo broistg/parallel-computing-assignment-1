@@ -1,93 +1,12 @@
-==> machine (dangnhh5)
+==> host Darwin/arm64 device=dangnhh5
     DangNguyens-MacBook-Air.local | Apple M3 | macOS 15.6.1 | 8 CPUs
-==> build
- Service benchmark  Building
- Service correctness  Building
-#0 building with "desktop-linux" instance using docker driver
-
-#1 [benchmark internal] load build definition from Dockerfile
-#1 transferring dockerfile: 521B done
-#1 DONE 0.0s
-
-#2 [correctness internal] load build definition from Dockerfile
-#2 transferring dockerfile: 521B done
-#2 DONE 0.0s
-
-#3 [correctness internal] load metadata for docker.io/library/ubuntu:24.04
-#3 ...
-
-#4 [correctness auth] library/ubuntu:pull token for registry-1.docker.io
-#4 DONE 0.0s
-
-#3 [correctness internal] load metadata for docker.io/library/ubuntu:24.04
-#3 DONE 2.1s
-
-#5 [benchmark internal] load .dockerignore
-#5 transferring context: 105B done
-#5 DONE 0.0s
-
-#6 [correctness internal] load .dockerignore
-#6 transferring context: 105B done
-#6 DONE 0.0s
-
-#7 [benchmark 1/7] FROM docker.io/library/ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
-#7 resolve docker.io/library/ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 done
-#7 DONE 0.0s
-
-#8 [benchmark internal] load build context
-#8 transferring context: 888B done
-#8 DONE 0.0s
-
-#9 [correctness internal] load build context
-#9 transferring context: 888B done
-#9 DONE 0.0s
-
-#10 [correctness 3/7] WORKDIR /src
-#10 CACHED
-
-#11 [correctness 2/7] RUN apt-get update && apt-get install -y --no-install-recommends         build-essential         ca-certificates         cmake     && rm -rf /var/lib/apt/lists/*
-#11 CACHED
-
-#12 [correctness 4/7] COPY CMakeLists.txt ./
-#12 CACHED
-
-#13 [correctness 5/7] COPY src ./src
-#13 CACHED
-
-#14 [correctness 6/7] RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release     && cmake --build build -j     && install -m 0755 build/benchmark build/correctness_test /usr/local/bin/
-#14 CACHED
-
-#15 [benchmark 7/7] WORKDIR /work
-#15 CACHED
-
-#16 [benchmark] exporting to image
-#16 exporting layers done
-#16 exporting manifest sha256:de3e176a7c0c7f97a90a7b6fa3bb263baa0c78bd14e34557d347a1e56bb8c661 done
-#16 exporting config sha256:c20728e7d59f717f3273771a3151be23bb233e7a9ea619bc6c930a28ba7ee07a done
-#16 exporting attestation manifest sha256:d348c00b705f7e4e85c338618674e2c41464558334b2e27afbe867ce3dc2e660 0.1s done
-#16 exporting manifest list sha256:dcd58e36b26fbf1302905be3b545c87d229eef6ab843f1fd0d3db2b38759c014
-#16 exporting manifest list sha256:dcd58e36b26fbf1302905be3b545c87d229eef6ab843f1fd0d3db2b38759c014 0.0s done
-#16 naming to docker.io/library/parallel-ex3:latest done
-#16 unpacking to docker.io/library/parallel-ex3:latest done
-#16 DONE 0.1s
-
-#17 [correctness] exporting to image
-#17 exporting layers done
-#17 exporting manifest sha256:4d6a059812a70420497a0cf42d298cd141b8499de5bae405e14fed9e3664bf31 done
-#17 exporting config sha256:dc0100025856498f47692fd8aea95fd15cd6a906f7839bb3dfe8e4522e414f8a 0.0s done
-#17 exporting attestation manifest sha256:1bf3877e824611c0d7f79e771a16c8d2e91fb7688803c8088161fb8494b50335 0.1s done
-#17 exporting manifest list sha256:e54a476f0838092a055d00cc304e30b00c09faedbd52f36f89ac4f4aef01ce44 0.0s done
-#17 naming to docker.io/library/parallel-ex3:latest done
-#17 unpacking to docker.io/library/parallel-ex3:latest 0.0s done
-#17 DONE 0.2s
-
-#18 [benchmark] resolving provenance for metadata file
- Service correctness  Built
- Service benchmark  Built
-#18 DONE 0.0s
-
-#19 [correctness] resolving provenance for metadata file
-#19 DONE 0.0s
+==> cmake build (-j8)
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/dangnhh/parallel_programing/assigment1/ex3/build
+[ 42%] Built target ex3_counters
+[100%] Built target correctness_test
+[100%] Built target benchmark
 ==> correctness
 ok   mutex threads=1 iters=1000
 ok   mutex threads=4 iters=50000
@@ -117,372 +36,373 @@ all correctness tests passed
 ==> matrix (180 runs) -> results/dangnhh5
     iters: 5 25 100 500 2500 10000 50000 200000 500000 1000000
   mutex t=1 i=5
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i5.json
+results/dangnhh5/mutex_t1_i5.json
   mutex t=1 i=25
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i25.json
+results/dangnhh5/mutex_t1_i25.json
   mutex t=1 i=100
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i100.json
+results/dangnhh5/mutex_t1_i100.json
   mutex t=1 i=500
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i500.json
+results/dangnhh5/mutex_t1_i500.json
   mutex t=1 i=2500
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i2500.json
+results/dangnhh5/mutex_t1_i2500.json
   mutex t=1 i=10000
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i10000.json
+results/dangnhh5/mutex_t1_i10000.json
   mutex t=1 i=50000
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i50000.json
+results/dangnhh5/mutex_t1_i50000.json
   mutex t=1 i=200000
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i200000.json
+results/dangnhh5/mutex_t1_i200000.json
   mutex t=1 i=500000
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i500000.json
+results/dangnhh5/mutex_t1_i500000.json
   mutex t=1 i=1000000
-/results/DangNguyens-MacBook-Air.local_mutex_t1_i1000000.json
+results/dangnhh5/mutex_t1_i1000000.json
   mutex t=2 i=5
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i5.json
+results/dangnhh5/mutex_t2_i5.json
   mutex t=2 i=25
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i25.json
+results/dangnhh5/mutex_t2_i25.json
   mutex t=2 i=100
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i100.json
+results/dangnhh5/mutex_t2_i100.json
   mutex t=2 i=500
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i500.json
+results/dangnhh5/mutex_t2_i500.json
   mutex t=2 i=2500
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i2500.json
+results/dangnhh5/mutex_t2_i2500.json
   mutex t=2 i=10000
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i10000.json
+results/dangnhh5/mutex_t2_i10000.json
   mutex t=2 i=50000
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i50000.json
+results/dangnhh5/mutex_t2_i50000.json
   mutex t=2 i=200000
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i200000.json
+results/dangnhh5/mutex_t2_i200000.json
   mutex t=2 i=500000
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i500000.json
+results/dangnhh5/mutex_t2_i500000.json
   mutex t=2 i=1000000
-/results/DangNguyens-MacBook-Air.local_mutex_t2_i1000000.json
+results/dangnhh5/mutex_t2_i1000000.json
   mutex t=4 i=5
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i5.json
+results/dangnhh5/mutex_t4_i5.json
   mutex t=4 i=25
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i25.json
+results/dangnhh5/mutex_t4_i25.json
   mutex t=4 i=100
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i100.json
+results/dangnhh5/mutex_t4_i100.json
   mutex t=4 i=500
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i500.json
+results/dangnhh5/mutex_t4_i500.json
   mutex t=4 i=2500
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i2500.json
+results/dangnhh5/mutex_t4_i2500.json
   mutex t=4 i=10000
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i10000.json
+results/dangnhh5/mutex_t4_i10000.json
   mutex t=4 i=50000
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i50000.json
+results/dangnhh5/mutex_t4_i50000.json
   mutex t=4 i=200000
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i200000.json
+results/dangnhh5/mutex_t4_i200000.json
   mutex t=4 i=500000
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i500000.json
+results/dangnhh5/mutex_t4_i500000.json
   mutex t=4 i=1000000
-/results/DangNguyens-MacBook-Air.local_mutex_t4_i1000000.json
+results/dangnhh5/mutex_t4_i1000000.json
   mutex t=8 i=5
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i5.json
+results/dangnhh5/mutex_t8_i5.json
   mutex t=8 i=25
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i25.json
+results/dangnhh5/mutex_t8_i25.json
   mutex t=8 i=100
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i100.json
+results/dangnhh5/mutex_t8_i100.json
   mutex t=8 i=500
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i500.json
+results/dangnhh5/mutex_t8_i500.json
   mutex t=8 i=2500
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i2500.json
+results/dangnhh5/mutex_t8_i2500.json
   mutex t=8 i=10000
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i10000.json
+results/dangnhh5/mutex_t8_i10000.json
   mutex t=8 i=50000
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i50000.json
+results/dangnhh5/mutex_t8_i50000.json
   mutex t=8 i=200000
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i200000.json
+results/dangnhh5/mutex_t8_i200000.json
   mutex t=8 i=500000
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i500000.json
+results/dangnhh5/mutex_t8_i500000.json
   mutex t=8 i=1000000
-/results/DangNguyens-MacBook-Air.local_mutex_t8_i1000000.json
+results/dangnhh5/mutex_t8_i1000000.json
   mutex t=16 i=5
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i5.json
+results/dangnhh5/mutex_t16_i5.json
   mutex t=16 i=25
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i25.json
+results/dangnhh5/mutex_t16_i25.json
   mutex t=16 i=100
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i100.json
+results/dangnhh5/mutex_t16_i100.json
   mutex t=16 i=500
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i500.json
+results/dangnhh5/mutex_t16_i500.json
   mutex t=16 i=2500
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i2500.json
+results/dangnhh5/mutex_t16_i2500.json
   mutex t=16 i=10000
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i10000.json
+results/dangnhh5/mutex_t16_i10000.json
   mutex t=16 i=50000
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i50000.json
+results/dangnhh5/mutex_t16_i50000.json
   mutex t=16 i=200000
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i200000.json
+results/dangnhh5/mutex_t16_i200000.json
   mutex t=16 i=500000
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i500000.json
+results/dangnhh5/mutex_t16_i500000.json
   mutex t=16 i=1000000
-/results/DangNguyens-MacBook-Air.local_mutex_t16_i1000000.json
+results/dangnhh5/mutex_t16_i1000000.json
   mutex t=32 i=5
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i5.json
+results/dangnhh5/mutex_t32_i5.json
   mutex t=32 i=25
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i25.json
+results/dangnhh5/mutex_t32_i25.json
   mutex t=32 i=100
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i100.json
+results/dangnhh5/mutex_t32_i100.json
   mutex t=32 i=500
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i500.json
+results/dangnhh5/mutex_t32_i500.json
   mutex t=32 i=2500
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i2500.json
+results/dangnhh5/mutex_t32_i2500.json
   mutex t=32 i=10000
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i10000.json
+results/dangnhh5/mutex_t32_i10000.json
   mutex t=32 i=50000
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i50000.json
+results/dangnhh5/mutex_t32_i50000.json
   mutex t=32 i=200000
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i200000.json
+results/dangnhh5/mutex_t32_i200000.json
   mutex t=32 i=500000
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i500000.json
+results/dangnhh5/mutex_t32_i500000.json
   mutex t=32 i=1000000
-/results/DangNguyens-MacBook-Air.local_mutex_t32_i1000000.json
+results/dangnhh5/mutex_t32_i1000000.json
   cas t=1 i=5
-/results/DangNguyens-MacBook-Air.local_cas_t1_i5.json
+results/dangnhh5/cas_t1_i5.json
   cas t=1 i=25
-/results/DangNguyens-MacBook-Air.local_cas_t1_i25.json
+results/dangnhh5/cas_t1_i25.json
   cas t=1 i=100
-/results/DangNguyens-MacBook-Air.local_cas_t1_i100.json
+results/dangnhh5/cas_t1_i100.json
   cas t=1 i=500
-/results/DangNguyens-MacBook-Air.local_cas_t1_i500.json
+results/dangnhh5/cas_t1_i500.json
   cas t=1 i=2500
-/results/DangNguyens-MacBook-Air.local_cas_t1_i2500.json
+results/dangnhh5/cas_t1_i2500.json
   cas t=1 i=10000
-/results/DangNguyens-MacBook-Air.local_cas_t1_i10000.json
+results/dangnhh5/cas_t1_i10000.json
   cas t=1 i=50000
-/results/DangNguyens-MacBook-Air.local_cas_t1_i50000.json
+results/dangnhh5/cas_t1_i50000.json
   cas t=1 i=200000
-/results/DangNguyens-MacBook-Air.local_cas_t1_i200000.json
+results/dangnhh5/cas_t1_i200000.json
   cas t=1 i=500000
-/results/DangNguyens-MacBook-Air.local_cas_t1_i500000.json
+results/dangnhh5/cas_t1_i500000.json
   cas t=1 i=1000000
-/results/DangNguyens-MacBook-Air.local_cas_t1_i1000000.json
+results/dangnhh5/cas_t1_i1000000.json
   cas t=2 i=5
-/results/DangNguyens-MacBook-Air.local_cas_t2_i5.json
+results/dangnhh5/cas_t2_i5.json
   cas t=2 i=25
-/results/DangNguyens-MacBook-Air.local_cas_t2_i25.json
+results/dangnhh5/cas_t2_i25.json
   cas t=2 i=100
-/results/DangNguyens-MacBook-Air.local_cas_t2_i100.json
+results/dangnhh5/cas_t2_i100.json
   cas t=2 i=500
-/results/DangNguyens-MacBook-Air.local_cas_t2_i500.json
+results/dangnhh5/cas_t2_i500.json
   cas t=2 i=2500
-/results/DangNguyens-MacBook-Air.local_cas_t2_i2500.json
+results/dangnhh5/cas_t2_i2500.json
   cas t=2 i=10000
-/results/DangNguyens-MacBook-Air.local_cas_t2_i10000.json
+results/dangnhh5/cas_t2_i10000.json
   cas t=2 i=50000
-/results/DangNguyens-MacBook-Air.local_cas_t2_i50000.json
+results/dangnhh5/cas_t2_i50000.json
   cas t=2 i=200000
-/results/DangNguyens-MacBook-Air.local_cas_t2_i200000.json
+results/dangnhh5/cas_t2_i200000.json
   cas t=2 i=500000
-/results/DangNguyens-MacBook-Air.local_cas_t2_i500000.json
+results/dangnhh5/cas_t2_i500000.json
   cas t=2 i=1000000
-/results/DangNguyens-MacBook-Air.local_cas_t2_i1000000.json
+results/dangnhh5/cas_t2_i1000000.json
   cas t=4 i=5
-/results/DangNguyens-MacBook-Air.local_cas_t4_i5.json
+results/dangnhh5/cas_t4_i5.json
   cas t=4 i=25
-/results/DangNguyens-MacBook-Air.local_cas_t4_i25.json
+results/dangnhh5/cas_t4_i25.json
   cas t=4 i=100
-/results/DangNguyens-MacBook-Air.local_cas_t4_i100.json
+results/dangnhh5/cas_t4_i100.json
   cas t=4 i=500
-/results/DangNguyens-MacBook-Air.local_cas_t4_i500.json
+results/dangnhh5/cas_t4_i500.json
   cas t=4 i=2500
-/results/DangNguyens-MacBook-Air.local_cas_t4_i2500.json
+results/dangnhh5/cas_t4_i2500.json
   cas t=4 i=10000
-/results/DangNguyens-MacBook-Air.local_cas_t4_i10000.json
+results/dangnhh5/cas_t4_i10000.json
   cas t=4 i=50000
-/results/DangNguyens-MacBook-Air.local_cas_t4_i50000.json
+results/dangnhh5/cas_t4_i50000.json
   cas t=4 i=200000
-/results/DangNguyens-MacBook-Air.local_cas_t4_i200000.json
+results/dangnhh5/cas_t4_i200000.json
   cas t=4 i=500000
-/results/DangNguyens-MacBook-Air.local_cas_t4_i500000.json
+results/dangnhh5/cas_t4_i500000.json
   cas t=4 i=1000000
-/results/DangNguyens-MacBook-Air.local_cas_t4_i1000000.json
+results/dangnhh5/cas_t4_i1000000.json
   cas t=8 i=5
-/results/DangNguyens-MacBook-Air.local_cas_t8_i5.json
+results/dangnhh5/cas_t8_i5.json
   cas t=8 i=25
-/results/DangNguyens-MacBook-Air.local_cas_t8_i25.json
+results/dangnhh5/cas_t8_i25.json
   cas t=8 i=100
-/results/DangNguyens-MacBook-Air.local_cas_t8_i100.json
+results/dangnhh5/cas_t8_i100.json
   cas t=8 i=500
-/results/DangNguyens-MacBook-Air.local_cas_t8_i500.json
+results/dangnhh5/cas_t8_i500.json
   cas t=8 i=2500
-/results/DangNguyens-MacBook-Air.local_cas_t8_i2500.json
+results/dangnhh5/cas_t8_i2500.json
   cas t=8 i=10000
-/results/DangNguyens-MacBook-Air.local_cas_t8_i10000.json
+results/dangnhh5/cas_t8_i10000.json
   cas t=8 i=50000
-/results/DangNguyens-MacBook-Air.local_cas_t8_i50000.json
+results/dangnhh5/cas_t8_i50000.json
   cas t=8 i=200000
-/results/DangNguyens-MacBook-Air.local_cas_t8_i200000.json
+results/dangnhh5/cas_t8_i200000.json
   cas t=8 i=500000
-/results/DangNguyens-MacBook-Air.local_cas_t8_i500000.json
+results/dangnhh5/cas_t8_i500000.json
   cas t=8 i=1000000
-/results/DangNguyens-MacBook-Air.local_cas_t8_i1000000.json
+results/dangnhh5/cas_t8_i1000000.json
   cas t=16 i=5
-/results/DangNguyens-MacBook-Air.local_cas_t16_i5.json
+results/dangnhh5/cas_t16_i5.json
   cas t=16 i=25
-/results/DangNguyens-MacBook-Air.local_cas_t16_i25.json
+results/dangnhh5/cas_t16_i25.json
   cas t=16 i=100
-/results/DangNguyens-MacBook-Air.local_cas_t16_i100.json
+results/dangnhh5/cas_t16_i100.json
   cas t=16 i=500
-/results/DangNguyens-MacBook-Air.local_cas_t16_i500.json
+results/dangnhh5/cas_t16_i500.json
   cas t=16 i=2500
-/results/DangNguyens-MacBook-Air.local_cas_t16_i2500.json
+results/dangnhh5/cas_t16_i2500.json
   cas t=16 i=10000
-/results/DangNguyens-MacBook-Air.local_cas_t16_i10000.json
+results/dangnhh5/cas_t16_i10000.json
   cas t=16 i=50000
-/results/DangNguyens-MacBook-Air.local_cas_t16_i50000.json
+results/dangnhh5/cas_t16_i50000.json
   cas t=16 i=200000
-/results/DangNguyens-MacBook-Air.local_cas_t16_i200000.json
+results/dangnhh5/cas_t16_i200000.json
   cas t=16 i=500000
-/results/DangNguyens-MacBook-Air.local_cas_t16_i500000.json
+results/dangnhh5/cas_t16_i500000.json
   cas t=16 i=1000000
-/results/DangNguyens-MacBook-Air.local_cas_t16_i1000000.json
+results/dangnhh5/cas_t16_i1000000.json
   cas t=32 i=5
-/results/DangNguyens-MacBook-Air.local_cas_t32_i5.json
+results/dangnhh5/cas_t32_i5.json
   cas t=32 i=25
-/results/DangNguyens-MacBook-Air.local_cas_t32_i25.json
+results/dangnhh5/cas_t32_i25.json
   cas t=32 i=100
-/results/DangNguyens-MacBook-Air.local_cas_t32_i100.json
+results/dangnhh5/cas_t32_i100.json
   cas t=32 i=500
-/results/DangNguyens-MacBook-Air.local_cas_t32_i500.json
+results/dangnhh5/cas_t32_i500.json
   cas t=32 i=2500
-/results/DangNguyens-MacBook-Air.local_cas_t32_i2500.json
+results/dangnhh5/cas_t32_i2500.json
   cas t=32 i=10000
-/results/DangNguyens-MacBook-Air.local_cas_t32_i10000.json
+results/dangnhh5/cas_t32_i10000.json
   cas t=32 i=50000
-/results/DangNguyens-MacBook-Air.local_cas_t32_i50000.json
+results/dangnhh5/cas_t32_i50000.json
   cas t=32 i=200000
-/results/DangNguyens-MacBook-Air.local_cas_t32_i200000.json
+results/dangnhh5/cas_t32_i200000.json
   cas t=32 i=500000
-/results/DangNguyens-MacBook-Air.local_cas_t32_i500000.json
+results/dangnhh5/cas_t32_i500000.json
   cas t=32 i=1000000
-/results/DangNguyens-MacBook-Air.local_cas_t32_i1000000.json
+results/dangnhh5/cas_t32_i1000000.json
   fetch_add t=1 i=5
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i5.json
+results/dangnhh5/fetch_add_t1_i5.json
   fetch_add t=1 i=25
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i25.json
+results/dangnhh5/fetch_add_t1_i25.json
   fetch_add t=1 i=100
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i100.json
+results/dangnhh5/fetch_add_t1_i100.json
   fetch_add t=1 i=500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i500.json
+results/dangnhh5/fetch_add_t1_i500.json
   fetch_add t=1 i=2500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i2500.json
+results/dangnhh5/fetch_add_t1_i2500.json
   fetch_add t=1 i=10000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i10000.json
+results/dangnhh5/fetch_add_t1_i10000.json
   fetch_add t=1 i=50000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i50000.json
+results/dangnhh5/fetch_add_t1_i50000.json
   fetch_add t=1 i=200000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i200000.json
+results/dangnhh5/fetch_add_t1_i200000.json
   fetch_add t=1 i=500000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i500000.json
+results/dangnhh5/fetch_add_t1_i500000.json
   fetch_add t=1 i=1000000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t1_i1000000.json
+results/dangnhh5/fetch_add_t1_i1000000.json
   fetch_add t=2 i=5
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i5.json
+results/dangnhh5/fetch_add_t2_i5.json
   fetch_add t=2 i=25
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i25.json
+results/dangnhh5/fetch_add_t2_i25.json
   fetch_add t=2 i=100
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i100.json
+results/dangnhh5/fetch_add_t2_i100.json
   fetch_add t=2 i=500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i500.json
+results/dangnhh5/fetch_add_t2_i500.json
   fetch_add t=2 i=2500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i2500.json
+results/dangnhh5/fetch_add_t2_i2500.json
   fetch_add t=2 i=10000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i10000.json
+results/dangnhh5/fetch_add_t2_i10000.json
   fetch_add t=2 i=50000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i50000.json
+results/dangnhh5/fetch_add_t2_i50000.json
   fetch_add t=2 i=200000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i200000.json
+results/dangnhh5/fetch_add_t2_i200000.json
   fetch_add t=2 i=500000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i500000.json
+results/dangnhh5/fetch_add_t2_i500000.json
   fetch_add t=2 i=1000000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t2_i1000000.json
+results/dangnhh5/fetch_add_t2_i1000000.json
   fetch_add t=4 i=5
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i5.json
+results/dangnhh5/fetch_add_t4_i5.json
   fetch_add t=4 i=25
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i25.json
+results/dangnhh5/fetch_add_t4_i25.json
   fetch_add t=4 i=100
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i100.json
+results/dangnhh5/fetch_add_t4_i100.json
   fetch_add t=4 i=500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i500.json
+results/dangnhh5/fetch_add_t4_i500.json
   fetch_add t=4 i=2500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i2500.json
+results/dangnhh5/fetch_add_t4_i2500.json
   fetch_add t=4 i=10000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i10000.json
+results/dangnhh5/fetch_add_t4_i10000.json
   fetch_add t=4 i=50000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i50000.json
+results/dangnhh5/fetch_add_t4_i50000.json
   fetch_add t=4 i=200000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i200000.json
+results/dangnhh5/fetch_add_t4_i200000.json
   fetch_add t=4 i=500000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i500000.json
+results/dangnhh5/fetch_add_t4_i500000.json
   fetch_add t=4 i=1000000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t4_i1000000.json
+results/dangnhh5/fetch_add_t4_i1000000.json
   fetch_add t=8 i=5
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i5.json
+results/dangnhh5/fetch_add_t8_i5.json
   fetch_add t=8 i=25
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i25.json
+results/dangnhh5/fetch_add_t8_i25.json
   fetch_add t=8 i=100
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i100.json
+results/dangnhh5/fetch_add_t8_i100.json
   fetch_add t=8 i=500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i500.json
+results/dangnhh5/fetch_add_t8_i500.json
   fetch_add t=8 i=2500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i2500.json
+results/dangnhh5/fetch_add_t8_i2500.json
   fetch_add t=8 i=10000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i10000.json
+results/dangnhh5/fetch_add_t8_i10000.json
   fetch_add t=8 i=50000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i50000.json
+results/dangnhh5/fetch_add_t8_i50000.json
   fetch_add t=8 i=200000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i200000.json
+results/dangnhh5/fetch_add_t8_i200000.json
   fetch_add t=8 i=500000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i500000.json
+results/dangnhh5/fetch_add_t8_i500000.json
   fetch_add t=8 i=1000000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t8_i1000000.json
+results/dangnhh5/fetch_add_t8_i1000000.json
   fetch_add t=16 i=5
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i5.json
+results/dangnhh5/fetch_add_t16_i5.json
   fetch_add t=16 i=25
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i25.json
+results/dangnhh5/fetch_add_t16_i25.json
   fetch_add t=16 i=100
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i100.json
+results/dangnhh5/fetch_add_t16_i100.json
   fetch_add t=16 i=500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i500.json
+results/dangnhh5/fetch_add_t16_i500.json
   fetch_add t=16 i=2500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i2500.json
+results/dangnhh5/fetch_add_t16_i2500.json
   fetch_add t=16 i=10000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i10000.json
+results/dangnhh5/fetch_add_t16_i10000.json
   fetch_add t=16 i=50000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i50000.json
+results/dangnhh5/fetch_add_t16_i50000.json
   fetch_add t=16 i=200000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i200000.json
+results/dangnhh5/fetch_add_t16_i200000.json
   fetch_add t=16 i=500000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i500000.json
+results/dangnhh5/fetch_add_t16_i500000.json
   fetch_add t=16 i=1000000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t16_i1000000.json
+results/dangnhh5/fetch_add_t16_i1000000.json
   fetch_add t=32 i=5
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i5.json
+results/dangnhh5/fetch_add_t32_i5.json
   fetch_add t=32 i=25
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i25.json
+results/dangnhh5/fetch_add_t32_i25.json
   fetch_add t=32 i=100
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i100.json
+results/dangnhh5/fetch_add_t32_i100.json
   fetch_add t=32 i=500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i500.json
+results/dangnhh5/fetch_add_t32_i500.json
   fetch_add t=32 i=2500
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i2500.json
+results/dangnhh5/fetch_add_t32_i2500.json
   fetch_add t=32 i=10000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i10000.json
+results/dangnhh5/fetch_add_t32_i10000.json
   fetch_add t=32 i=50000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i50000.json
+results/dangnhh5/fetch_add_t32_i50000.json
   fetch_add t=32 i=200000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i200000.json
+results/dangnhh5/fetch_add_t32_i200000.json
   fetch_add t=32 i=500000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i500000.json
+results/dangnhh5/fetch_add_t32_i500000.json
   fetch_add t=32 i=1000000
-/results/DangNguyens-MacBook-Air.local_fetch_add_t32_i1000000.json
+results/dangnhh5/fetch_add_t32_i1000000.json
 ==> aggregate + plots
-wrote 180 rows to /Users/dangnhh/parallel_programing/ex3/results/dangnhh5/summary.csv
-/Users/dangnhh/parallel_programing/ex3/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.png
-/Users/dangnhh/parallel_programing/ex3/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.pdf
-/Users/dangnhh/parallel_programing/ex3/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.png
-/Users/dangnhh/parallel_programing/ex3/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.pdf
-/Users/dangnhh/parallel_programing/ex3/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.png
-/Users/dangnhh/parallel_programing/ex3/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.pdf
-plots in /Users/dangnhh/parallel_programing/ex3/results/dangnhh5/plots (1 device(s))
+wrote 180 rows to /Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/summary.csv
+/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.png
+/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.pdf
+/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.png
+/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.pdf
+/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.png
+/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.pdf
+plots in /Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots (1 device(s))
 done: results/dangnhh5/
+copy this folder to your merge machine, then: ./run.sh merge  (or .\run.ps1 merge)

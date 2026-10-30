@@ -47,11 +47,17 @@ def _cpu_model() -> str:
     if system == "Linux":
         try:
             for line in Path("/proc/cpuinfo").read_text().splitlines():
-                if line.startswith("model name"):
+                if line.startswith("model name") or line.startswith("Model name"):
                     return line.split(":", 1)[1].strip()
         except OSError:
             pass
         return platform.processor() or "unknown"
+    if system == "Windows":
+        return (
+            os.environ.get("PROCESSOR_IDENTIFIER")
+            or platform.processor()
+            or "unknown"
+        )
     return platform.processor() or "unknown"
 
 
@@ -66,6 +72,29 @@ def _memory_bytes() -> int | None:
                 if line.startswith("MemTotal:"):
                     return int(line.split()[1]) * 1024
         except (OSError, ValueError, IndexError):
+            return None
+    if system == "Windows":
+        try:
+            import ctypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            st = MEMORYSTATUSEX()
+            st.dwLength = ctypes.sizeof(st)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+                return int(st.ullTotalPhys)
+        except (AttributeError, OSError, ValueError):
             return None
     return None
 
@@ -83,6 +112,8 @@ def _os_name() -> str:
         except OSError:
             pass
         return f"Linux {platform.release()}"
+    if system == "Windows":
+        return f"Windows {platform.release()} ({platform.version()})"
     return f"{system} {platform.release()}"
 
 

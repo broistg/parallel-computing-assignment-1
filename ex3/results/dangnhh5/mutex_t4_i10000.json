@@ -1,0 +1,12 @@
+{
+  "hostname": "DangNguyens-MacBook-Air.local",
+  "cpu_model": "Apple M3",
+  "os": "macOS 15.6.1",
+  "logical_cpus": 8,
+  "memory_bytes": 17179869184,
+  "threads": 4,
+  "increments_per_thread": 10000,
+  "impl": "mutex",
+  "seconds": 0.000573,
+  "total_increments": 40000
+}
