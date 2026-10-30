@@ -1,0 +1,6 @@
+build/
+results/*
+!results/.gitkeep
+*.o
+*.a
+.DS_Store

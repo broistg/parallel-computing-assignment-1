@@ -1,0 +1,20 @@
+# RESULTS_DIR is the host folder mounted at /results inside the container.
+# EX3_* vars carry the real host machine identity into the Linux image.
+services:
+  benchmark:
+    image: parallel-ex3
+    build: .
+    entrypoint: ["benchmark"]
+    volumes:
+      - ${RESULTS_DIR:-./results}:/results
+    environment:
+      EX3_HOSTNAME: ${EX3_HOSTNAME:-}
+      EX3_CPU_MODEL: ${EX3_CPU_MODEL:-}
+      EX3_LOGICAL_CPUS: ${EX3_LOGICAL_CPUS:-}
+      EX3_OS: ${EX3_OS:-}
+      EX3_MEMORY_BYTES: ${EX3_MEMORY_BYTES:-}
+
+  correctness:
+    image: parallel-ex3
+    build: .
+    entrypoint: ["correctness_test"]
