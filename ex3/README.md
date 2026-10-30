@@ -14,7 +14,7 @@ Native one-command study on **macOS, Linux, and Windows**: correctness tests, ex
 Example:
 
 ```bash
-./run.sh dangnhh5
+./run.sh dangnhh
 ```
 
 Smoke (one iters size):
@@ -66,7 +66,7 @@ python3 -m pip install --user matplotlib
 2. `winget install Kitware.CMake Python.Python.3.12`
 3. Ensure `cmake` and `python` are on PATH
 4. `python -m pip install matplotlib`
-5. `.\run.ps1 dangnhh5`
+5. `.\run.ps1 dangnhh`
 
 ## Three platforms → report
 

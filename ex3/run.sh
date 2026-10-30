@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Portable one-command study: macOS + Linux + Windows (Git Bash / WSL).
 # Windows PowerShell users: prefer .\run.ps1 <name>
-#   ./run.sh dangnhh5
+#   ./run.sh dangnhh
 #   ITERS=5000 ./run.sh smoke
 #   ./run.sh merge
 set -euo pipefail

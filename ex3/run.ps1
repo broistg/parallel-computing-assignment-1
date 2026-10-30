@@ -1,5 +1,5 @@
 # Portable one-command study for Windows (PowerShell 5+ / 7+).
-#   .\run.ps1 dangnhh5
+#   .\run.ps1 dangnhh
 #   $env:ITERS=5000; .\run.ps1 smoke
 #   .\run.ps1 merge
 param(
