@@ -3,7 +3,7 @@
 ==> cmake build (-j8)
 -- Configuring done (0.1s)
 -- Generating done (0.0s)
--- Build files have been written to: /Users/dangnhh/parallel_programing/assigment1/ex3/build
+-- Build files have been written to: /Users/dangnhh/parallel_programing/assigment1/shared/counter/build
 [ 42%] Built target ex3_counters
 [100%] Built target correctness_test
 [100%] Built target benchmark
@@ -396,13 +396,13 @@ results/dangnhh5/fetch_add_t32_i500000.json
   fetch_add t=32 i=1000000
 results/dangnhh5/fetch_add_t32_i1000000.json
 ==> aggregate + plots
-wrote 180 rows to /Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/summary.csv
-/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.png
-/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.pdf
-/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.png
-/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.pdf
-/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.png
-/Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.pdf
-plots in /Users/dangnhh/parallel_programing/assigment1/ex3/results/dangnhh5/plots (1 device(s))
+wrote 180 rows to /Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/summary.csv
+/Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.png
+/Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/plots/time_vs_threads_DangNguyens-MacBook-Air.pdf
+/Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.png
+/Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/plots/time_vs_iters_DangNguyens-MacBook-Air.pdf
+/Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.png
+/Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/plots/throughput_vs_threads_DangNguyens-MacBook-Air.pdf
+plots in /Users/dangnhh/parallel_programing/assigment1/shared/counter/results/dangnhh5/plots (1 device(s))
 done: results/dangnhh5/
 copy this folder to your merge machine, then: ./run.sh merge  (or .\run.ps1 merge)
